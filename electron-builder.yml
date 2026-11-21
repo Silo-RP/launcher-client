@@ -1,0 +1,63 @@
+appId: 'silolauncher'
+productName: 'Silo Launcher'
+# ${name} = package.json "name". uicore.js rebuilds the macOS download URL
+# from the same value (launcherConfig.ARTIFACT_PREFIX), keep both in sync.
+artifactName: '${name}-setup-${version}.${ext}'
+
+copyright: 'Copyright © 2018-2026 Daniel Scalzi, TheHecateII'
+
+asar: true
+compression: 'maximum'
+
+files:
+  - '!{dist,.gitignore,.vscode,docs,dev-app-update.yml,.nvmrc,eslint.config.mjs,null}'
+
+extraResources:
+  - 'libraries'
+
+# Windows Configuration
+win:
+  icon: build/icon.ico
+  target: 
+    - target: 'nsis'
+      arch: 'x64'
+
+# Windows Installer Configuration
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+
+# macOS Configuration
+mac:
+  icon: build/icon.png
+  identity: null
+  target:
+    - target: 'dmg'
+      arch:
+        - 'x64'
+        - 'arm64'
+  artifactName: '${name}-setup-${version}-${arch}.${ext}'
+  category: 'public.app-category.games'
+
+# Linux Configuration
+linux:
+  icon: build/icon.png
+  target: 'deb'
+  maintainer: 'TheHecateII'
+  vendor: 'TheHecateII'
+  synopsis: 'Modded Minecraft Launcher'
+  description: 'Custom launcher which allows users to join modded servers. All mods, configurations, and updates are handled automatically.'
+  category: 'Game'
+
+
+directories:
+  buildResources: 'build'
+  output: 'dist'
+
+# Must match launcherConfig.GITHUB_REPO.
+publish:
+  provider: github
+  owner: Silo-RP
+  repo: launcher-client
