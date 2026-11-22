@@ -327,20 +327,6 @@ class ProcessBuilder {
 
     }
 
-    _processAutoConnectArg(args){
-        if(ConfigManager.getAutoConnect() && this.server.rawServer.autoconnect){
-            if(mcVersionAtLeast('1.20', this.server.rawServer.minecraftVersion)){
-                args.push('--quickPlayMultiplayer')
-                args.push(`${this.server.hostname}:${this.server.port}`)
-            } else {
-                args.push('--server')
-                args.push(this.server.hostname)
-                args.push('--port')
-                args.push(this.server.port)
-            }
-        }
-    }
-
     /**
      * Construct the argument array that will be passed to the JVM process.
      * 
@@ -541,9 +527,8 @@ class ProcessBuilder {
             }
         }
 
-        // Autoconnect
-        this._processAutoConnectArg(args)
-        
+        // No auto-connect (--server / --quickPlayMultiplayer): players always
+        // go through the main menu, by design.
 
         // Forge Specific Arguments
         args = args.concat(this.modManifest.arguments.game)
@@ -609,8 +594,7 @@ class ProcessBuilder {
             }
         }
 
-        // Autoconnect to the selected server.
-        this._processAutoConnectArg(mcArgs)
+        // No auto-connect: players always go through the main menu, by design.
 
         // Prepare game resolution
         if(ConfigManager.getFullscreen()){

@@ -103,7 +103,6 @@ const DEFAULT_CONFIG = {
             resWidth: 1280,
             resHeight: 720,
             fullscreen: false,
-            autoConnect: true,
             launchDetached: true,
             minimizeOnLaunch: false
         },
@@ -804,25 +803,6 @@ exports.getFullscreen = function(def = false){
  */
 exports.setFullscreen = function(fullscreen){
     config.settings.game.fullscreen = fullscreen
-}
-
-/**
- * Check if the game should auto connect to servers.
- * 
- * @param {boolean} def Optional. If true, the default value will be returned.
- * @returns {boolean} Whether or not the game should auto connect to servers.
- */
-exports.getAutoConnect = function(def = false){
-    return !def ? config.settings.game.autoConnect : DEFAULT_CONFIG.settings.game.autoConnect
-}
-
-/**
- * Change the status of whether or not the game should auto connect to servers.
- * 
- * @param {boolean} autoConnect Whether or not the game should auto connect to servers.
- */
-exports.setAutoConnect = function(autoConnect){
-    config.settings.game.autoConnect = autoConnect
 }
 
 /**
