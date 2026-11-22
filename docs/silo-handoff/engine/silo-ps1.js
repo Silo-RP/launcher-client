@@ -1126,7 +1126,8 @@
 
       var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       var speed = opts.speed == null ? 1 : opts.speed, target = speed, mode = opts.mode || 'walk';
-      var phase = opts.phase || 0, time = 0, last = 0, acc = 0, raf = 0, alive = true, paused = false;
+      var phase = opts.phase || 0, time = 0, last = 0, timer = 0, alive = true, paused = false;
+      var STEP = 1000 / 30;   // 30 images/s, comme à l'époque (et moins de GPU)
 
       var draw = function () {
         var cam = sc.cam(phase, mode), fr = cam.fog || sc.fogRange;
@@ -1152,30 +1153,31 @@
           gl.drawArrays(gl.TRIANGLES, 0, ps.n);
         }
       };
-      var frame = function (now) {
-        if (!alive) return;
-        if (paused) { raf = 0; return; }
-        raf = requestAnimationFrame(frame);
-        if (!last) last = now;
-        var dt = Math.min(0.1, (now - last) / 1000);
-        last = now; acc += dt;
-        if (acc < 1 / 30) return; // 30 images/s, comme à l'époque (et moins de GPU)
-        var st = acc; acc = 0;
+      // Minuterie à 30 Hz plutôt qu'une boucle requestAnimationFrame : celle-ci réveillait la
+      // page à chaque rafraîchissement de l'écran (jusqu'à 240 fois par seconde) pour ne
+      // dessiner qu'une image sur huit. Le canvas est composé à l'image écran suivante.
+      var frame = function () {
+        timer = 0;
+        if (!alive || paused) return;
+        var now = performance.now();
+        var st = last ? Math.min(0.1, (now - last) / 1000) : 1 / 30;
+        last = now;
         speed += (target - speed) * Math.min(1, st * 1.5);
         time += st;
         phase += st * speed * (reduce ? 0.15 : 1);
         draw();
+        timer = setTimeout(frame, STEP);
       };
       draw();
-      raf = requestAnimationFrame(frame);
+      timer = setTimeout(frame, STEP);
       return {
         setSpeed: function (v) { target = v; },
         // pause complète (aucune image calculée) : jeu lancé, menu caché…
         pause: function () { paused = true; },
         resume: function () {
           if (!alive || !paused) return;
-          paused = false; last = 0; acc = 0;
-          if (!raf) raf = requestAnimationFrame(frame);
+          paused = false; last = 0;
+          if (!timer) timer = setTimeout(frame, STEP);
         },
         setMode: function (m) { mode = m; },
         // aspect du béton : grain 0–1,5 (intensité de la texture), cold 0–1 (béton plus froid)
@@ -1186,7 +1188,7 @@
         },
         destroy: function () {
           alive = false;
-          cancelAnimationFrame(raf);
+          clearTimeout(timer);
           var ext = gl.getExtension('WEBGL_lose_context');
           if (ext) ext.loseContext();
         }

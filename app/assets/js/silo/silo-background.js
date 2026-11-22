@@ -51,7 +51,7 @@
       container.insertBefore(cv, veil);
       var h = window.SiloPS1.mount(cv, { scene: scene, grain: look.grain, cold: look.cold });
       h.pause();
-      layers[scene] = { canvas: cv, handle: h };
+      layers[scene] = { canvas: cv, handle: h, hiddenAt: Date.now() };
       return layers[scene];
     }
 
@@ -69,8 +69,10 @@
           if (current && current.scene !== def.scene) {
             current.layer.handle.pause();
             current.layer.canvas.style.display = 'none';
+            current.layer.hiddenAt = Date.now();
           }
           L.canvas.style.display = 'block';
+          L.hiddenAt = 0;
           L.handle.setMode(mode);
           L.handle.setSpeed(1);
           if (running()) L.handle.resume();
@@ -87,8 +89,39 @@
     }
     document.addEventListener('visibilitychange', onVisibility);
 
+    // Construit d'avance les scènes des menus donnés (une par appel de rappel), pour que la
+    // première visite n'ait plus à les construire pendant le fondu.
+    function preload(keys, schedule) {
+      var todo = keys.map(function (k) { return MENUS[k] && MENUS[k].scene; })
+        .filter(function (sc, i, all) { return sc && all.indexOf(sc) === i && !layers[sc]; });
+      var next = function () {
+        if (!todo.length || destroyed) return;
+        var sc = todo.shift();
+        if (!layers[sc]) layer(sc);
+        schedule(next);
+      };
+      schedule(next);
+    }
+
+    // Libère les scènes cachées depuis plus de maxIdleMs (contexte WebGL rendu, mémoire graphique
+    // libérée). Une scène libérée est reconstruite à la visite suivante, pendant le fondu.
+    function trim(maxIdleMs) {
+      Object.keys(layers).forEach(function (sc) {
+        var L = layers[sc];
+        if (current && current.layer === L) return;
+        if (L.hiddenAt && Date.now() - L.hiddenAt > maxIdleMs) {
+          L.handle.destroy();
+          L.canvas.remove();
+          delete layers[sc];
+        }
+      });
+    }
+    var destroyed = false;
+
     return {
       show: show,
+      preload: preload,
+      trim: trim,
       setSpeed: function (v) { if (current) current.layer.handle.setSpeed(v); },
       setLook: function (o) {
         if (o.grain != null) look.grain = o.grain;
@@ -98,6 +131,7 @@
       pause: function () { manualPause = true; onVisibility(); },
       resume: function () { manualPause = false; onVisibility(); },
       destroy: function () {
+        destroyed = true;
         document.removeEventListener('visibilitychange', onVisibility);
         Object.keys(layers).forEach(function (k) { layers[k].handle.destroy(); layers[k].canvas.remove(); });
         layers = {}; current = null; veil.remove();

@@ -22,11 +22,24 @@ const siloBanners = {}
 function siloEnsureBg(){
     if(siloGameRunning) return null
     if(siloBg == null && typeof window.SiloBackground === 'function'){
-        siloBg = window.SiloBackground(document.getElementById('bg'))
+        const bg = window.SiloBackground(document.getElementById('bg'))
+        siloBg = bg
         siloBgRefresh()
+        // Build the other rooms while idle, so the first visit to Bulletin or
+        // Paramètres no longer builds its scene during the fade.
+        setTimeout(() => {
+            if(siloBg === bg){
+                bg.preload(['accueil', 'bulletin', 'parametres'], next => requestIdleCallback(next, { timeout: 4000 }))
+            }
+        }, 3000)
     }
     return siloBg
 }
+
+// Rooms hidden for a long time are released (GPU memory) and rebuilt on the
+// next visit, during the fade.
+const SILO_SCENE_IDLE_MS = 10 * 60 * 1000
+setInterval(() => siloBg?.trim(SILO_SCENE_IDLE_MS), 60 * 1000)
 
 /** Run or freeze the background: animated setting on and no game running. */
 function siloBgRefresh(){
