@@ -148,36 +148,56 @@
   // plafond, néons.
   function buildStairs() {
     var PI = Math.PI;
-    var Hl = 4.76;                      // hauteur d'un niveau (un demi-tour d'escalier)
-    var NS = 27, rise = Hl / 28;        // 27 marches + le palier
+    var Hl = 4.76;                      // hauteur d'un niveau
     var L = 0.5104;                     // palier = 2·asin(1,3 / rOut) : le ruban s'arrête pile au nu du parapet de la passerelle
-    var ds = (PI - L) / NS;
+    // Direction de la passerelle de chaque niveau, en quarts de tour (0 = est, 1 = nord, 2 = ouest,
+    // 3 = sud) : les 4 points cardinaux dans un ordre erratique, jamais deux fois de suite la même.
+    // L'escalier tourne d'un demi-tour ou de trois quarts de tour entre deux paliers pour tomber
+    // sur la direction suivante. La suite se répète tous les 8 niveaux (5 tours complets) :
+    // les boucles de caméra restent sans raccord.
+    var DIRS = [0, 2, 1, 3, 2, 0, 3, 1], PER = DIRS.length;
+    var DS0 = (PI - L) / 27;            // pas angulaire d'une marche (même giron sur toutes les volées)
     var rCol = 1.5, rIn = 1.42, rP = 4.9, rOut = 5.15;   // fût central (Ø 3 m), départ des marches (noyé dans le fût), parapet, face extérieure
     var rG = 13.0, rF = 16.6, rE = 17.2;            // coursives : bord de dalle, façade, fond
     var rC = 12.5, NC = 12;                         // colonnes, juste devant le parapet des coursives
     var NG = 48, dG = TAU / NG;                     // segments de coursive (~2,2 m de façade chacun)
-    var K0 = -2, K1 = 11;                           // niveaux construits (au-delà, tout est dans le brouillard)
+    var K0 = -2, K1 = 18;                           // niveaux construits (boucles de caméra sur 8 niveaux + brouillard)
     var warm = [1.0, 0.9, 0.74];
     var bright = [1.0, 0.95, 0.84], dim = [0.6, 0.55, 0.46];
     var k, j, y;
 
+    // angle cumulé du palier de chaque niveau (l'escalier tourne toujours dans le même sens)
+    function turns(kk) { var q = mod(DIRS[mod(kk + 1, PER)] - DIRS[mod(kk, PER)], 4); return q === 1 ? 5 : q; }
+    var KMIN = K0 - 2, KMAX = K1 + 2, THL = [0];
+    for (k = 0; k < KMAX; k++) THL[k + 1] = THL[k] + turns(k) * PI / 2;
+    for (k = -1; k >= KMIN; k--) THL[k] = THL[k + 1] - turns(k) * PI / 2;
+    function TH(kk) { return THL[kk] + DIRS[0] * PI / 2; }
+    var ROT = TH(PER) - TH(0);          // rotation sur une période (multiple de 2π)
+    function levelAt(a) {
+      var kk = KMIN;
+      while (kk < KMAX - 1 && TH(kk + 1) - L / 2 <= a) kk++;
+      return kk;
+    }
     function smoothY(a) {
-      var kk = Math.floor((a + L / 2) / PI), u = a - (kk * PI - L / 2);
+      var kk = levelAt(a), u = a - (TH(kk) - L / 2), span = TH(kk + 1) - TH(kk);
       if (u <= L) return -kk * Hl;
-      return -kk * Hl - ((u - L) / (PI - L)) * Hl;
+      return -kk * Hl - Math.min(1, (u - L) / (span - L)) * Hl;
     }
     function sAvg(a) {
       return (smoothY(a - 0.24) + smoothY(a - 0.12) + smoothY(a) + smoothY(a + 0.12) + smoothY(a + 0.24)) / 5;
     }
-    function colA(n) { return (n + 0.5) * TAU / NC; }   // décalées des passerelles (angles 0 et π)
+    function colA(n) { return (n + 0.5) * TAU / NC; }   // décalées des passerelles (points cardinaux)
 
     var lights = [];
     for (k = K0; k < K1; k++) {
       y = -k * Hl;
       for (j = 0; j < NC; j++) lights.push({ p: cyl(rC - 0.9, colA(j), y + 0.32), c: warm, r: 6.5, i: 1.0 });
       for (j = 0; j < 4; j++) lights.push({ p: cyl(6.8, PI / 4 + j * PI / 2, y + 2.0), c: warm, r: 7, i: 0.6 });
-      var sa = [k * PI + 1.0, k * PI + 2.2];
-      for (j = 0; j < 2; j++) lights.push({ p: cyl(rCol + 0.25, sa[j], smoothY(sa[j]) + 2.2), c: warm, r: 6, i: 0.9, a: sa[j] });
+      // appliques du fût le long de la volée, environ tous les 70°
+      for (var t = 1.0; t < TH(k + 1) - TH(k) - 0.5; t += 1.2) {
+        var sa = TH(k) + t;
+        lights.push({ p: cyl(rCol + 0.25, sa, smoothY(sa) + 2.2), c: warm, r: 6, i: 0.9, a: sa });
+      }
       for (j = 0; j < 8; j++) lights.push({ p: cyl(15.4, PI / 8 + j * PI / 4, y + Hl - 1.0), c: [0.95, 0.93, 0.86], r: 6.5, i: 1.15 });
     }
     var m = new Mesh(lights, [0.2, 0.185, 0.16], Hl);
@@ -265,7 +285,8 @@
 
     for (k = K0; k < K1; k++) {
       y = -k * Hl;
-      var th = k * PI;
+      var th = TH(k), span = TH(k + 1) - th;
+      var NS = Math.round((span - L) / DS0), ds = (span - L) / NS, rise = Hl / (NS + 1);
 
       // palier
       for (j = 0; j < 2; j++) {
@@ -287,12 +308,12 @@
         m.beam(cyl(rP + 0.03, a0, s0 + 1.2), cyl(rP + 0.03, a1, s1 + 1.2), 0.05, black, 0);
         if (j % 3 === 0) m.beam(cyl(rP + 0.03, a0, s0 + 1.05), cyl(rP + 0.03, a0, s0 + 1.2), 0.03, black, 0);
       }
-      var fe = th + PI - L / 2, yn = y - Hl;
+      var fe = th + span - L / 2, yn = y - Hl;
       m.quad(cyl(rIn, fe, yn), cyl(rP, fe, yn), cyl(rP, fe, yn + rise), cyl(rIn, fe, yn + rise), concD, 0);
       m.quad(cyl(rP, fa, y - 0.55), cyl(rOut, fa, y - 0.55), cyl(rOut, fa, y + 1.05), cyl(rP, fa, y + 1.05), conc, 0);
       m.quad(cyl(rP, fe, yn - 0.55), cyl(rOut, fe, yn - 0.55), cyl(rOut, fe, yn + 1.05), cyl(rP, fe, yn + 1.05), conc, 0);
 
-      // passerelle vers la coursive (alterne de côté à chaque niveau).
+      // passerelle vers la coursive (point cardinal du niveau, jamais le même qu'au niveau précédent).
       // Ses parapets prolongent le ruban de l'escalier et rejoignent le parapet de la coursive : aucun jour aux raccords.
       var ux = Math.cos(th), uz = Math.sin(th), tx = -Math.sin(th), tz = Math.cos(th);
       var P = function (r, sv, yy) { return [ux * r + tx * sv, yy, uz * r + tz * sv]; };
@@ -314,14 +335,15 @@
       m.beam(cyl(rP + 0.03, th - L / 2, y + 1.2), P(hr0, -1.17, y + 1.2), 0.05, black, 0);
 
       // ---- coursive en anneau et façades ----
-      var even = mod(k, 2) === 0, bA = even ? 0 : PI, wb = Math.asin(1.3 / rG);
+      // parapet ouvert face à la passerelle du niveau
+      var dK = DIRS[mod(k, PER)], sOpen = dK * NG / 4, bA = dK * PI / 2, wb = Math.asin(1.3 / rG);
       var fh = y + Hl - 0.45, yMid = y + 2.85;
       for (var s = 0; s < NG; s++) {
         var b0 = s * dG, b1 = b0 + dG, mid = b0 + dG / 2, gs = s * 13 + mod(k, 2) * 7;
         var h1 = hash(gs + 0.5), h2 = hash(gs + 1.7), h3 = hash(gs + 2.9), h4 = hash(gs + 4.1), hp = hash(s * 7.3 + 0.2);
 
         // parapet en boudin, ouvert pile à la largeur de la passerelle (bouchons aux extrémités)
-        var open = even ? (s === 0 || s === NG - 1) : (s === NG / 2 - 1 || s === NG / 2);
+        var open = s === mod(sOpen, NG) || s === mod(sOpen - 1, NG);
         if (!open) {
           sweep(PROF, b0, b1, y, tint(conc, gs, 0.05));
           m.beam(cyl(rG + 0.15, b0, y + 1.24), cyl(rG + 0.15, b1, y + 1.24), 0.05, teal, 0);
@@ -409,15 +431,16 @@
       mesh: m, fog: [0.075, 0.066, 0.055], fogRange: [8, 38], fov: 58, flick: 0.25, texPeriod: 2 * Hl,
       cam: function (ph, mode) {
         if (mode === 'void') {
-          // plongée dans le vide central, inclinée vers le fût : on voit les passerelles
-          // partir une fois d'un côté, une fois de l'autre, niveau après niveau
-          var yv = -2 * Hl + 6 - mod(ph * 0.5, 2 * Hl), sw = Math.sin(ph * 0.05) * 0.1;
-          var ev = cyl(10.5, PI / 2 + sw, yv);
-          return { eye: ev, target: cyl(0, PI / 2 + sw, yv - 11), up: [0, 1, 0], fog: [4, 40] };
+          // plongée dans le vide central depuis la diagonale nord-est (loin de l'axe des passerelles),
+          // inclinée vers le fût : les passerelles partent vers les quatre points cardinaux, niveau
+          // après niveau, sous une lente rotation. Boucle sur une période (8 niveaux).
+          var yv = -2 * Hl + 6 - mod(ph * 0.5, PER * Hl), rot = ph * 0.04;
+          var ev = cyl(8.6, PI / 4, yv);
+          return { eye: ev, target: cyl(3.0, PI / 4, yv - 12), up: [Math.cos(rot), 0, Math.sin(rot)], fog: [4, 44] };
         }
         if (mode === 'orbit') {
-          // on tourne autour de l'escalier en descendant, au rythme de sa spirale
-          var phi = TAU + mod(ph * 0.06, TAU), yc = -(phi / PI) * Hl + 3.4;
+          // on tourne autour de l'escalier en descendant, au rythme de sa spirale (3,4 m au-dessus des marches)
+          var phi = TH(2) + mod(ph * 0.06, ROT), yc = sAvg(phi) + 3.4;
           var eo = cyl(8.2, phi, yc + Math.sin(ph * 0.5) * 0.06);
           return { eye: eo, target: [-Math.sin(phi) * 2.0, yc - 2.6, Math.cos(phi) * 2.0], up: [0, 1, 0], fov: 58 };
         }
@@ -425,7 +448,7 @@
         // La hauteur suit une moyenne glissante de la pente : pas d'à-coup aux paliers.
         // Trajectoire à 1,5 m du parapet et 1,9 m du pilier, rien ne traverse la caméra.
         // Regard naturel : ~22° vers le bas, dans l'axe des marches.
-        var a = TAU + mod(ph * 0.12, TAU);
+        var a = TH(2) + mod(ph * 0.12, ROT);   // boucle sur une période : 8 niveaux, raccord invisible
         var eye = cyl(3.4, a, sAvg(a) + 1.65 + Math.sin(ph * 4.2) * 0.018);
         // cap = tangente tournée vers le pilier pour suivre la courbe des marches (~0,5 rad),
         // avec une lente dérive vers le vide de l'atrium
