@@ -91,14 +91,27 @@ class ProcessBuilder {
         child.stdout.setEncoding('utf8')
         child.stderr.setEncoding('utf8')
 
-        child.stdout.on('data', (data) => {
-            data.trim().split('\n').forEach(x => console.log(`\x1b[32m[Minecraft]\x1b[0m ${x}`))
-            
-        })
-        child.stderr.on('data', (data) => {
-            data.trim().split('\n').forEach(x => console.log(`\x1b[31m[Minecraft]\x1b[0m ${x}`))
-        })
+        // The game's output is always read (an unread pipe would block the
+        // game), but only echoed in full while it loads: once loaded (sound
+        // engine up, or after 3 minutes) only errors are echoed. Everything
+        // is still in the instance's logs/latest.log.
+        let echoAll = true
+        const quietTimer = setTimeout(() => { echoAll = false }, 180000)
+        const echo = (prefix, data) => {
+            data.trim().split('\n').forEach(x => {
+                if(echoAll || /\/(ERROR|FATAL)\]|Exception/.test(x)){
+                    console.log(`${prefix} ${x}`)
+                }
+                if(echoAll && x.includes('Sound engine started')){
+                    echoAll = false
+                    clearTimeout(quietTimer)
+                }
+            })
+        }
+        child.stdout.on('data', (data) => echo('\x1b[32m[Minecraft]\x1b[0m', data))
+        child.stderr.on('data', (data) => echo('\x1b[31m[Minecraft]\x1b[0m', data))
         child.on('close', (code) => {
+            clearTimeout(quietTimer)
             logger.info('Exited with code', code)
             fs.remove(tempNativePath, (err) => {
                 if(err){

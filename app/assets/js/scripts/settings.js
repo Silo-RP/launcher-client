@@ -671,7 +671,7 @@ async function resolveAddonsForUI(){
     let adminEntries = []
     try {
         const uuid = ConfigManager.getSelectedAccount()?.uuid
-        const syncConfig = await syncClient.fetchConfig(SYNC_URL, uuid)
+        const syncConfig = await syncClient.fetchConfig(SYNC_URL, uuid, { maxAgeMs: 60000 })
         const addonEntries = (syncConfig.entries || []).filter(e => e.path.startsWith(ADDONS_ENTRY_PREFIX))
         optionalEntries = addonEntries.filter(e => e.mode === 'optional')
         adminEntries = addonEntries.filter(e => e.mode === 'admin')

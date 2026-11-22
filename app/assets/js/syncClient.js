@@ -44,10 +44,31 @@ function isRetryableError(error) {
 // decide whether to include "admin" mode addons (staff-only, see
 // silo-sync's app/rules.py + app/access.py) in `entries` at all - omitted
 // entirely for everyone else, not just hidden client-side.
-async function fetchConfig(baseUrl, uuid) {
+//
+// Responses are kept in memory: a caller passing `maxAgeMs` reuses one that
+// is at most that old (the launch reuses the copy the distribution refresh
+// fetched a moment before, the Settings reuse the startup one), and calls
+// made while the same request is in flight share it. maxAgeMs 0 = fresh.
+const configCache = new Map()
+
+async function fetchConfig(baseUrl, uuid, { maxAgeMs = 0 } = {}) {
     const url = uuid ? `${baseUrl}/config.json?uuid=${encodeURIComponent(uuid)}` : `${baseUrl}/config.json`
-    const res = await got(url, { responseType: 'json', timeout: { request: 30000 } })
-    return res.body
+    const hit = configCache.get(url)
+    if (hit && (hit.pending || Date.now() - hit.at <= maxAgeMs)) {
+        return hit.promise
+    }
+    const entry = { at: Date.now(), pending: true }
+    entry.promise = got(url, { responseType: 'json', timeout: { request: 30000 } }).then(res => res.body)
+    configCache.set(url, entry)
+    try {
+        const body = await entry.promise
+        entry.pending = false
+        entry.at = Date.now()
+        return body
+    } catch (err) {
+        configCache.delete(url)
+        throw err
+    }
 }
 
 // ---------- downloads ----------

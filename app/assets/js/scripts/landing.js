@@ -519,7 +519,8 @@ async function dlAsync(login = true) {
             setDownloadPercentage(percent)
         }
 
-        const syncConfig = await syncClient.fetchConfig(SYNC_URL, ConfigManager.getSelectedAccount()?.uuid)
+        // Fetched a moment ago by refreshDistributionOrFallback() above.
+        const syncConfig = await syncClient.fetchConfig(SYNC_URL, ConfigManager.getSelectedAccount()?.uuid, { maxAgeMs: 30000 })
         setLaunchDetails(Lang.queryJS('landing.dlAsync.preparingJava'))
         setLaunchPhase('java')
         const javaPath = await syncClient.ensureJava(syncConfig.java, commonDir, onDlProgress)

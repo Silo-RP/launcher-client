@@ -18,6 +18,7 @@
 const { HeliosDistribution } = require('helios-core/common')
 
 const syncClient = require('./syncClient')
+const ConfigManager = require('./configmanager')
 const { SYNC_URL } = require('./launcherConfig')
 
 class SyncDistroAdapter {
@@ -29,7 +30,9 @@ class SyncDistroAdapter {
     }
 
     async _load() {
-        const config = await syncClient.fetchConfig(SYNC_URL)
+        // Same request (with the account's uuid) as the launch and the
+        // Settings make, so they can reuse this response (see fetchConfig).
+        const config = await syncClient.fetchConfig(SYNC_URL, ConfigManager.getSelectedAccount()?.uuid)
         const meta = config.server || {}
         const raw = {
             version: '1.0.0',
