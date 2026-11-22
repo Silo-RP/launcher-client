@@ -672,8 +672,8 @@ label.field { cursor: pointer; }
 .primary:hover { filter: brightness(1.06); }
 .ghost.small { width: auto; height: 44px; padding: 0 18px 0 calc(18px + 0.16em); font-size: 16px; letter-spacing: 0.16em; text-transform: uppercase; }
 
-#serverSelectListScrollable, #accountSelectListScrollable { display: flex; flex-direction: column; max-height: 220px; overflow: auto; }
-.serverListing, .accountListing {
+#accountSelectListScrollable { display: flex; flex-direction: column; max-height: 220px; overflow: auto; }
+.accountListing {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -687,11 +687,5 @@ label.field { cursor: pointer; }
     text-align: left;
     color: var(--silo-text-2);
 }
-.serverListing:hover, .accountListing:hover { background: rgba(236, 228, 214, 0.04); }
-.serverListing[selected], .accountListing[selected] { border-left-color: var(--silo-text); color: var(--silo-text); }
-.serverListingImg { width: 32px; height: 32px; }
-.serverListingDetails { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.serverListingName { font-weight: 500; }
-.serverListingDescription, .serverListingInfo { font-size: 12px; color: var(--silo-text-2); }
-.serverListingInfo { display: flex; gap: 10px; }
-.serverListingStarWrapper { display: none; }
+.accountListing:hover { background: rgba(236, 228, 214, 0.04); }
+.accountListing[selected] { border-left-color: var(--silo-text); color: var(--silo-text); }

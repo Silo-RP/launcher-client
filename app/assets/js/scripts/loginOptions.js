@@ -2,8 +2,6 @@ const loginOptionsCancelContainer = document.getElementById('loginOptionCancelCo
 const loginOptionMicrosoft = document.getElementById('loginOptionMicrosoft')
 const loginOptionsCancelButton = document.getElementById('loginOptionCancelButton')
 
-let loginOptionsCancellable = false
-
 let loginOptionsViewOnLoginSuccess
 let loginOptionsViewOnLoginCancel
 let loginOptionsViewOnCancel
@@ -28,15 +26,10 @@ loginOptionMicrosoft.onclick = (e) => {
 }
 
 // Mojang accounts no longer exist (all migrated to Microsoft): only the
-// Microsoft button is offered. login.ejs/login.js stay loaded because other
-// scripts still clear or prefill its fields.
+// Microsoft button is offered.
 
 loginOptionsCancelButton.onclick = (e) => {
     switchView(getCurrentView(), loginOptionsViewOnCancel, 200, 200, () => {
-        // Clear login values (Mojang login)
-        // No cleanup needed for Microsoft.
-        loginUsername.value = ''
-        loginPassword.value = ''
         if(loginOptionsViewCancelHandler != null){
             loginOptionsViewCancelHandler()
             loginOptionsViewCancelHandler = null

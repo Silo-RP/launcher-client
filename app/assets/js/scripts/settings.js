@@ -285,6 +285,19 @@ settingsNavDone.onclick = () => {
  * Account Management Tab
  */
 
+/**
+ * Whether a login failure carries a message meant for the player
+ * ({ title, desc }, see authmanager.js) rather than a raw error.
+ *
+ * @param {*} it The rejection value.
+ * @returns {boolean} True if it can be shown as is.
+ */
+function isDisplayableError(it){
+    return it != null && typeof it === 'object'
+        && Object.prototype.hasOwnProperty.call(it, 'title')
+        && Object.prototype.hasOwnProperty.call(it, 'desc')
+}
+
 const msftLoginLogger = LoggerUtil.getLogger('Microsoft Login')
 const msftLogoutLogger = LoggerUtil.getLogger('Microsoft Logout')
 
@@ -467,23 +480,20 @@ function processLogOut(val, isLastAccount){
             ipcRenderer.send(MSFT_OPCODE.OPEN_LOGOUT, uuid, isLastAccount)
         })
     } else {
-        AuthManager.removeMojangAccount(uuid).then(() => {
-            if(!isLastAccount && uuid === prevSelAcc.uuid){
-                const selAcc = ConfigManager.getSelectedAccount()
-                refreshAuthAccountSelected(selAcc.uuid)
-                updateSelectedAccount(selAcc)
-                validateSelectedAccount()
-            }
-            if(isLastAccount) {
-                loginOptionsCancelEnabled(false)
-                loginOptionsViewOnLoginSuccess = VIEWS.landing
-                loginOptionsViewOnLoginCancel = VIEWS.loginOptions
-                switchView(getCurrentView(), VIEWS.loginOptions)
-            }
-        })
-        $(parent).fadeOut(250, () => {
-            parent.remove()
-        })
+        // Legacy non-Microsoft account: nothing to revoke, just forget it.
+        ConfigManager.removeAuthAccount(uuid)
+        ConfigManager.save()
+        parent.remove()
+        if(isLastAccount) {
+            loginOptionsCancelEnabled(false)
+            loginOptionsViewOnLoginSuccess = VIEWS.landing
+            loginOptionsViewOnLoginCancel = VIEWS.loginOptions
+            switchView(getCurrentView(), VIEWS.loginOptions)
+        } else if(uuid === prevSelAcc.uuid) {
+            const selAcc = ConfigManager.getSelectedAccount()
+            updateSelectedAccount(selAcc)
+            validateSelectedAccount()
+        }
     }
 }
 

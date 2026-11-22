@@ -295,32 +295,13 @@ exports.getServerInstanceDirectory = function(serverId){
 }
 
 /**
- * Retrieve the launcher's Client Token.
- * There is no default client token.
- * 
- * @returns {string} The launcher's Client Token.
- */
-exports.getClientToken = function(){
-    return config.clientToken
-}
-
-/**
- * Set the launcher's Client Token.
- * 
- * @param {string} clientToken The launcher's new Client Token.
- */
-exports.setClientToken = function(clientToken){
-    config.clientToken = clientToken
-}
-
-/**
  * Retrieve the ID of the selected serverpack.
  * 
  * @param {boolean} def Optional. If true, the default value will be returned.
  * @returns {string} The ID of the selected serverpack.
  */
 exports.getSelectedServer = function(def = false){
-    return !def ? config.selectedServer : DEFAULT_CONFIG.clientToken
+    return !def ? config.selectedServer : DEFAULT_CONFIG.selectedServer
 }
 
 /**
@@ -349,42 +330,6 @@ exports.getAuthAccounts = function(){
  * @returns {Object} The authenticated account with the given uuid.
  */
 exports.getAuthAccount = function(uuid){
-    return config.authenticationDatabase[uuid]
-}
-
-/**
- * Update the access token of an authenticated mojang account.
- * 
- * @param {string} uuid The uuid of the authenticated account.
- * @param {string} accessToken The new Access Token.
- * 
- * @returns {Object} The authenticated account object created by this action.
- */
-exports.updateMojangAuthAccount = function(uuid, accessToken){
-    config.authenticationDatabase[uuid].accessToken = accessToken
-    config.authenticationDatabase[uuid].type = 'mojang' // For gradual conversion.
-    return config.authenticationDatabase[uuid]
-}
-
-/**
- * Adds an authenticated mojang account to the database to be stored.
- * 
- * @param {string} uuid The uuid of the authenticated account.
- * @param {string} accessToken The accessToken of the authenticated account.
- * @param {string} username The username (usually email) of the authenticated account.
- * @param {string} displayName The in game name of the authenticated account.
- * 
- * @returns {Object} The authenticated account object created by this action.
- */
-exports.addMojangAuthAccount = function(uuid, accessToken, username, displayName){
-    config.selectedAccount = uuid
-    config.authenticationDatabase[uuid] = {
-        type: 'mojang',
-        accessToken,
-        username: username.trim(),
-        uuid: uuid.trim(),
-        displayName: displayName.trim()
-    }
     return config.authenticationDatabase[uuid]
 }
 
