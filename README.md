@@ -48,7 +48,7 @@ Everything project-specific lives in these files - nothing else in the codebase 
 | Window title, home/login texts (fallback title, tagline, Pacte line), YouTube/Discord links (empty = hidden) | `app/assets/lang/_custom.toml` |
 | Colors, fonts, window metrics | `app/assets/css/silo/tokens.css` (styles: `app/assets/css/silo/app.css`) |
 | 3D background (rooms, scene per menu) | `app/assets/js/silo/` (copied as-is from `docs/silo-handoff/engine/`) |
-| In-app logo | `app/assets/images/logo.png` / `logo.ico` |
+| Window / taskbar icon | `app/assets/images/logo.png` / `logo.ico` (source: `docs/branding/logo_fondateur.png`) |
 | Installer / app icons | `build/icon.png` (512x512) / `build/icon.ico` |
 | App name, package name (also the installer file prefix), version | `package.json` (`productName`, `name`, `version`) |
 | Installer identity, release repo for auto-updates | `electron-builder.yml` (`appId`, `productName`, `publish`), `dev-app-update.yml` |
