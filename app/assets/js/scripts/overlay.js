@@ -86,24 +86,14 @@ function toggleOverlay(toggleState, dismissable = false, content = 'overlayConte
             $('#overlayDismiss').hide()
         }
         $('#overlayContainer').fadeIn({
-            duration: 250,
-            start: () => {
-                if(getCurrentView() === VIEWS.settings){
-                    document.getElementById('settingsContainer').style.backgroundColor = 'transparent'
-                }
-            }
+            duration: 200
         })
     } else {
         document.getElementById('main').removeAttribute('overlay')
         // Make things tabbable.
         $('#main *').removeAttr('tabindex')
         $('#overlayContainer').fadeOut({
-            duration: 250,
-            start: () => {
-                if(getCurrentView() === VIEWS.settings){
-                    document.getElementById('settingsContainer').style.backgroundColor = 'rgba(0, 0, 0, 0.50)'
-                }
-            },
+            duration: 200,
             complete: () => {
                 $('#' + content).parent().children().hide()
                 $('#' + content).show()
@@ -304,9 +294,8 @@ function populateAccountListings(){
     const accounts = Array.from(Object.keys(accountsObj), v=>accountsObj[v])
     let htmlString = ''
     for(let i=0; i<accounts.length; i++){
-        htmlString += `<button class="accountListing" uuid="${accounts[i].uuid}" ${i===0 ? 'selected' : ''}>
-            <img src="https://mc-heads.net/head/${accounts[i].uuid}/40">
-            <div class="accountListingName">${accounts[i].displayName}</div>
+        htmlString += `<button type="button" class="accountListing" uuid="${accounts[i].uuid}" ${i===0 ? 'selected' : ''}>
+            <span class="accountListingName">${accounts[i].displayName}</span>
         </button>`
     }
     document.getElementById('accountSelectListScrollable').innerHTML = htmlString

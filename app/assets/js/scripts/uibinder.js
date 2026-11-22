@@ -9,12 +9,6 @@ const { Type }      = require('helios-distribution-types')
 const AuthManager   = require('./assets/js/authmanager')
 const ConfigManager = require('./assets/js/configmanager')
 const { DistroAPI } = require('./assets/js/distromanager')
-// Named distinctly from landing.js's own `syncClient`/`SYNC_URL` -
-// classic <script> tags share one global scope, and redeclaring the same
-// const name across two of them is a SyntaxError that breaks every script
-// on the page (this has already happened once).
-const syncClientBg = require('./assets/js/syncClient')
-const { SYNC_URL: BACKGROUND_SYNC_URL } = require('./assets/js/launcherConfig')
 
 const loggerUIBinder = LoggerUtil.getLogger('UIBinder')
 
@@ -35,7 +29,7 @@ const VIEWS = {
     loginOptions: '#loginOptionsContainer',
     login: '#loginContainer',
     settings: '#settingsContainer',
-    welcome: '#welcomeContainer',
+    news: '#newsContainer',
     waiting: '#waitingContainer'
 }
 
@@ -54,8 +48,10 @@ let currentView
  * @param {*} onNextFade Optional. Callback function to execute when the next view
  * fades in.
  */
-function switchView(current, next, currentFadeTime = 500, nextFadeTime = 500, onCurrentFade = () => {}, onNextFade = () => {}){
+function switchView(current, next, currentFadeTime = 200, nextFadeTime = 200, onCurrentFade = () => {}, onNextFade = () => {}){
     currentView = next
+    // The 3D background follows the view (fade to black between scenes).
+    siloOnView(next)
     $(`${current}`).fadeOut(currentFadeTime, async () => {
         await onCurrentFade()
         $(`${next}`).fadeIn(nextFadeTime, async () => {
@@ -73,60 +69,6 @@ function getCurrentView(){
     return currentView
 }
 
-const BACKGROUND_ROTATE_MS = 12000
-
-/**
- * Preloads an image before it's used as a background - setting
- * backgroundImage to a URL that hasn't finished downloading yet risks a
- * blank/flash frame while it loads.
- */
-function preloadImage(url){
-    return new Promise((resolve, reject) => {
-        const img = new Image()
-        img.onload = () => resolve()
-        img.onerror = () => reject(new Error(`Failed to load ${url}`))
-        img.src = url
-    })
-}
-
-/**
- * Rotates the launcher's background through whatever silo-sync exposes
- * under backgrounds/ (see /config.json's "backgrounds" list), every
- * BACKGROUND_ROTATE_MS. Entirely optional: if the server is unreachable or
- * hasn't got any backgrounds configured, this just leaves the window's own
- * backgroundColor (see index.js) showing - never blocks startup or shows
- * an error over a purely cosmetic feature.
- */
-async function startBackgroundSlideshow(){
-    let backgrounds
-    try {
-        const config = await syncClientBg.fetchConfig(BACKGROUND_SYNC_URL)
-        backgrounds = config.backgrounds
-    } catch (err) {
-        loggerUIBinder.warn('Unable to fetch background list, keeping the default background.', err)
-        return
-    }
-
-    if(backgrounds == null || backgrounds.length === 0){
-        return
-    }
-
-    let index = 0
-    const showNext = async () => {
-        const bg = backgrounds[index % backgrounds.length]
-        index++
-        try {
-            await preloadImage(bg.url)
-            document.body.style.backgroundImage = `url('${bg.url}')`
-        } catch (err) {
-            loggerUIBinder.warn(`Skipping background ${bg.url}:`, err)
-        }
-    }
-
-    await showNext()
-    setInterval(showNext, BACKGROUND_ROTATE_MS)
-}
-
 function revealLauncherUI() {
     if(!isDev){
         const { AUTO_UPDATES_ENABLED } = require('./assets/js/ipcconstants')
@@ -136,34 +78,26 @@ function revealLauncherUI() {
         }
     }
 
-    document.getElementById('frameBar').style.backgroundColor = 'rgba(0, 0, 0, 0.5)'
-    // No bundled local default anymore - the wolf image moved to
-    // silo-sync's backgrounds/ folder, served through the same
-    // slideshow as everything else. Until it loads, the window's own
-    // backgroundColor ('#171614', see index.js) shows through.
-    startBackgroundSlideshow()
+    // The background is the 3D scene of the current view (siloui.js); the
+    // backend's background images are no longer used.
     $('#main').show()
 
     const isLoggedIn = Object.keys(ConfigManager.getAuthAccounts()).length > 0
 
-    if(ConfigManager.isFirstLaunch()){
-        currentView = VIEWS.welcome
-        $(VIEWS.welcome).fadeIn(1000)
-    } else if(isLoggedIn){
+    if(isLoggedIn){
         currentView = VIEWS.landing
-        $(VIEWS.landing).fadeIn(1000)
     } else {
+        // First launch or every account logged out: straight to Connexion.
         loginOptionsCancelEnabled(false)
         loginOptionsViewOnLoginSuccess = VIEWS.landing
         loginOptionsViewOnLoginCancel = VIEWS.loginOptions
         currentView = VIEWS.loginOptions
-        $(VIEWS.loginOptions).fadeIn(1000)
     }
+    siloOnView(currentView)
+    $(currentView).fadeIn(400)
 
     setTimeout(() => {
-        $('#loadingContainer').fadeOut(500, () => {
-            $('#loadSpinnerImage').removeClass('rotating')
-        })
+        $('#loadingContainer').fadeOut(300)
     }, 250)
 
     if(!isDev && isLoggedIn){
@@ -222,6 +156,8 @@ function completeStartupUI(data) {
     // reads it (getMaxRAM etc.) right away. Cheap (one entry per server).
     try {
         ensureJavaSettings(data)
+        // The memory shown under JOUER needs that entry.
+        refreshLandingMeta()
     } catch (err) {
         loggerUIBinder.warn('Failed to ensure java settings during startup.', err)
     }

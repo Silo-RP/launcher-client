@@ -5,7 +5,8 @@ import globals from 'globals';
 
 export default defineConfig(
   {
-    ignores: ['**/dist/**', 'node_modules', 'eslint.config.mjs'],
+    // app/assets/js/silo: 3D engine copied as-is from docs/silo-handoff (not reformatted).
+    ignores: ['**/dist/**', 'node_modules', 'eslint.config.mjs', 'app/assets/js/silo/**', 'docs/**'],
   },
   js.configs.recommended,
   {

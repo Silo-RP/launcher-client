@@ -23,9 +23,10 @@ Forked from [Ventrys Launcher][ventrys-launcher], itself built on top of [Helios
 - **Automatic Java, Forge, mod and config sync** from `silo-sync` on every launch - nothing to install or choose manually.
 - **Optional addons**: mods/shaders the server makes available but doesn't enforce, toggled per-player from Settings.
 - **Orphan file cleanup**: a file removed server-side is removed client-side on the next launch (scoped to explicitly-managed folders only - never touches saves/screenshots/logs).
-- **News / patch notes** and **rotating backgrounds**, both served by `silo-sync`.
+- **Bulletins** (news) served by `silo-sync`: each `## ` heading of the admin news page is one bulletin.
+- **Animated low-poly 3D background** (WebGL, PS1 style): one room per menu, paused while the game runs, can be turned off in Settings.
 - **Self-updating launcher** (`electron-updater`, GitHub releases of this repo).
-- RAM / JVM options, Mojang service status, and a built-in debug console (dedicated button on the main screen).
+- RAM / JVM options, an outage banner when Minecraft services are down, and a built-in debug console (Settings > Avancé).
 
 Removed relative to upstream HeliosLauncher: `distribution.json`/Nebula, multi-server selection, RSS news feed, Discord Rich Presence, Mojang (Yggdrasil) account login (deprecated by Mojang), Java auto-detection/download via Adoptium.
 
@@ -44,8 +45,9 @@ Everything project-specific lives in these files - nothing else in the codebase 
 | What | Where |
 | --- | --- |
 | Backend URL, GitHub repo, game data folder name | `app/assets/js/launcherConfig.js` |
-| Window title, welcome texts, YouTube/Discord links (empty = hidden), About links | `app/assets/lang/_custom.toml` |
-| Accent color | `--brand-accent` in `app/assets/css/launcher.css` |
+| Window title, home/login texts (fallback title, tagline, Pacte line), YouTube/Discord links (empty = hidden) | `app/assets/lang/_custom.toml` |
+| Colors, fonts, window metrics | `app/assets/css/silo/tokens.css` (styles: `app/assets/css/silo/app.css`) |
+| 3D background (rooms, scene per menu) | `app/assets/js/silo/` (copied as-is from `docs/silo-handoff/engine/`) |
 | In-app logo | `app/assets/images/logo.png` / `logo.ico` |
 | Installer / app icons | `build/icon.png` (512x512) / `build/icon.ico` |
 | App name, package name (also the installer file prefix), version | `package.json` (`productName`, `name`, `version`) |
@@ -54,7 +56,7 @@ Everything project-specific lives in these files - nothing else in the codebase 
 
 `GITHUB_REPO` in `launcherConfig.js` and the `publish` block of `electron-builder.yml` must point to the same repository.
 
-The backgrounds and the news panel are not part of the launcher build: they're uploaded to `silo-sync` (`backgrounds/` folder, admin news page).
+The server name and description shown on the home screen come from `silo-sync` (`server_meta`), the bulletins from its admin news page. The visual direction and UI rules are in [`docs/silo-handoff/CLAUDE_CODE_BRIEF.md`](docs/silo-handoff/CLAUDE_CODE_BRIEF.md) (reference: `demo.html`).
 
 ## Development
 

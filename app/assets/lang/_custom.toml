@@ -1,5 +1,5 @@
 # Project-specific texts and links, loaded last: overrides fr_FR.toml.
-# Leave a media URL empty to hide its button on the landing page.
+# Leave a media URL empty to hide its link in the settings footer.
 
 [ejs.app]
 title = "Silo Launcher"
@@ -7,12 +7,16 @@ title = "Silo Launcher"
 [ejs.landing]
 mediaYouTubeURL = ""
 mediaDiscordURL = ""
+# Fallbacks: the home screen shows the server name and description from the
+# backend (server_meta) as soon as they are loaded.
+title = "SILO"
+tagline = "Roleplay de survie souterraine"
+pacte = "Le Pacte, article 1 : on n’évoque pas l’extérieur."
+
+[ejs.loginOptions]
+title = "SILO"
+lead = "Identifiez-vous pour entrer dans le silo."
 
 [ejs.settings]
 sourceGithubLink = "https://github.com/Silo-RP/launcher-client"
 supportLink = "https://github.com/Silo-RP/launcher-client/issues"
-
-[ejs.welcome]
-welcomeHeader = "BIENVENUE DANS LE SILO"
-welcomeDescription = "Sous terre, le Silo abrite ce qu'il reste de l'humanité. Le launcher installe automatiquement les mods et la configuration nécessaires pour rejoindre le serveur."
-welcomeDescCTA = "La descente commence ici."

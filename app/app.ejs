@@ -1,49 +1,34 @@
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta charset="utf-8" http-equiv="Content-Security-Policy" content="script-src 'self' 'sha256-In6B8teKZQll5heMl9bS7CESTbGvuAt3VVV86BUQBDk='"/>
     <title><%= lang('app.title') %></title>
+    <link type="text/css" rel="stylesheet" href="./assets/css/silo/tokens.css">
+    <link type="text/css" rel="stylesheet" href="./assets/css/silo/app.css">
     <script src="./assets/js/remote-shim.js"></script>
+    <script src="./assets/js/silo/silo-ps1.js"></script>
+    <script src="./assets/js/silo/silo-background.js"></script>
     <script src="./assets/js/scripts/uicore.js"></script>
     <script src="./assets/js/scripts/uibinder.js"></script>
-    <link type="text/css" rel="stylesheet" href="./assets/css/launcher.css">
-    <style>
-        body {
-            transition: background-image 1s ease;
-            background-image: url('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcgSlBFRyB2ODApLCBkZWZhdWx0IHF1YWxpdHkK/9sAQwAIBgYHBgUIBwcHCQkICgwUDQwLCwwZEhMPFB0aHx4dGhwcICQuJyAiLCMcHCg3KSwwMTQ0NB8nOT04MjwuMzQy/9sAQwEJCQkMCwwYDQ0YMiEcITIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy/8AAEQgAPwBwAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/aAAwDAQACEQMRAD8A8VooopDCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAP/9k=');
-            background-size: cover;
-            -webkit-user-select: none;
-        }
-        #main {
-            display: none;
-            height: calc(100% - 22px);
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
-            width: 100%;
-            position: absolute;
-            z-index: 10;
-        }
-        #main[overlay] {
-            filter: blur(3px) contrast(0.9) brightness(1.0);
-        }
-    </style>
+    <script src="./assets/js/scripts/siloui.js"></script>
 </head>
-<body>
+<body data-screen="chargement">
+    <!-- Single 3D background, mounted once behind the whole UI (see siloui.js). -->
+    <div id="bg" aria-hidden="true"></div>
+    <div id="shade" aria-hidden="true"></div>
+    <!-- Before #main: settings.js and landing.js grab the account menu and
+         the account name from the top bar when they load. -->
     <%- include('frame') %>
     <div id="main">
-        <%- include('welcome') %>
         <%- include('login') %>
         <%- include('waiting') %>
         <%- include('loginOptions') %>
         <%- include('settings') %>
+        <%- include('news') %>
         <%- include('landing') %>
     </div>
     <%- include('overlay') %>
-    <%- include('news') %>
     <div id="loadingContainer">
-        <div id="loadingContent">
-            <div id="loadSpinnerContainer">
-                <img id="loadCenterImage" src="assets/images/logo.png">
-            </div>
-        </div>
+        <svg class="emblem emblemPulse" width="56" height="56" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-opacity="0.7" stroke-width="0.8"/><circle cx="10" cy="10" r="5.2" fill="none" stroke="currentColor" stroke-opacity="0.7" stroke-width="0.8"/><circle cx="10" cy="10" r="1.7" fill="#E3A341"/></svg>
     </div>
 </body>
 </html>

@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Silo Launcher — démo de référence</title>
+<!-- Démo autonome : à ouvrir dans Chrome/Edge. Dans le launcher, embarquer les polices en local. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&amp;family=Barlow:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="ui/tokens.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #050505; }
+  body { display: grid; place-items: center; font-family: var(--silo-font); color: var(--silo-text); -webkit-font-smoothing: antialiased; }
+  button, select, input { font: inherit; }
+  :focus-visible { outline: 2px solid var(--silo-accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* ---- fenêtre ---- */
+  .app { position: relative; width: var(--silo-window-w); height: var(--silo-window-h); overflow: hidden; background: #0E0D0B; }
+  .bg, .shade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+  .shade { pointer-events: none; transition: background 0.3s; }
+  .app[data-screen="accueil"] .shade, .app[data-screen="lancement"] .shade {
+    background:
+      linear-gradient(0deg, rgba(15,14,12,0.92) 0, rgba(15,14,12,0) 190px),
+      linear-gradient(90deg, rgba(15,14,12,0.9) 0, rgba(15,14,12,0.6) 290px, rgba(15,14,12,0) 640px),
+      linear-gradient(180deg, rgba(15,14,12,0.8) 0, rgba(15,14,12,0) 96px),
+      radial-gradient(ellipse 90% 80% at 60% 40%, rgba(15,14,12,0) 45%, rgba(15,14,12,0.6) 100%);
+  }
+  .app[data-screen="connexion"] .shade { background: radial-gradient(ellipse 42% 58% at 50% 52%, rgba(15,14,12,0.78) 0, rgba(15,14,12,0.45) 60%, rgba(15,14,12,0.7) 100%); }
+  .app[data-screen="bulletin"] .shade {
+    background:
+      linear-gradient(0deg, #0F0E0C 0, rgba(15,14,12,0.88) 135px, rgba(15,14,12,0) 300px),
+      linear-gradient(180deg, rgba(15,14,12,0.8) 0, rgba(15,14,12,0) 96px);
+  }
+  .app[data-screen="parametres"] .shade {
+    background:
+      linear-gradient(180deg, rgba(15,14,12,0.8) 0, rgba(15,14,12,0) 96px),
+      radial-gradient(ellipse 65% 75% at 30% 45%, rgba(4,5,8,0) 35%, rgba(4,5,8,0.88) 100%);
+  }
+  .view { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: none; }
+  .app[data-screen="connexion"] .view[data-view="connexion"],
+  .app[data-screen="accueil"] .view[data-view="accueil"],
+  .app[data-screen="lancement"] .view[data-view="lancement"],
+  .app[data-screen="bulletin"] .view[data-view="bulletin"],
+  .app[data-screen="parametres"] .view[data-view="parametres"] { display: block; }
+
+  /* ---- barre du haut ---- */
+  .topbar { position: absolute; top: 0; right: 0; left: 0; height: var(--silo-topbar-h); display: flex; align-items: center; justify-content: space-between; padding-left: 28px; z-index: 2; }
+  .nav { display: flex; align-items: center; gap: 28px; height: 100%; }
+  .nav-link { display: flex; align-items: center; height: 100%; box-sizing: border-box; padding-top: 2px; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 500; color: var(--silo-text-2); text-decoration: none; }
+  .nav-link:hover { color: var(--silo-text); }
+  .nav-link[aria-current="page"] { color: var(--silo-text); border-bottom-color: var(--silo-accent); }
+  .win { display: flex; align-items: center; height: 100%; }
+  .chip { display: flex; align-items: center; gap: 10px; height: 100%; padding: 0 14px; border: 0; background: transparent; color: var(--silo-text); font-size: 13px; font-weight: 500; cursor: pointer; }
+  .chip:hover { background: rgba(236,228,214,0.06); }
+  .avatar { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; box-sizing: border-box; background: #2A2823; border: 1px solid rgba(236,228,214,0.14); color: var(--silo-text-2); }
+  .sep { width: 1px; height: 20px; margin: 0 6px; background: var(--silo-line); }
+  .wc { display: flex; align-items: center; justify-content: center; width: 46px; height: 100%; border: 0; background: transparent; color: var(--silo-text-2); cursor: pointer; }
+  .wc:hover { background: rgba(236,228,214,0.08); color: var(--silo-text); }
+  .wc-close:hover { background: var(--silo-danger); color: #fff; }
+  .app[data-screen="connexion"] .nav, .app[data-screen="connexion"] .chip, .app[data-screen="connexion"] .sep { visibility: hidden; }
+
+  /* ---- éléments communs ---- */
+  .title { margin: 0 -0.3em 0 0; font: 600 76px/0.9 var(--silo-font-display); letter-spacing: 0.3em; }
+  .muted { color: var(--silo-text-2); }
+  .small { font-size: 12px; color: var(--silo-text-2); }
+  .bottom { position: absolute; right: var(--silo-margin); bottom: 36px; left: var(--silo-margin); display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; }
+  .col { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; min-width: 0; }
+  .side { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; flex-shrink: 0; }
+  .play, .ghost { display: flex; align-items: center; justify-content: center; width: var(--silo-play-w); height: var(--silo-play-h); box-sizing: border-box; padding-left: 0.24em; font: 600 22px var(--silo-font-display); letter-spacing: 0.24em; text-decoration: none; cursor: pointer; }
+  .play { border: 0; background: var(--silo-accent); color: var(--silo-on-accent); }
+  .play:hover { filter: brightness(1.08); }
+  .ghost { border: 1px solid rgba(236,228,214,0.3); background: rgba(15,14,12,0.4); color: var(--silo-text); font-size: 20px; }
+  .ghost:hover { background: rgba(236,228,214,0.08); }
+  .ingame { border: 1px solid var(--silo-accent); background: rgba(227,163,65,0.12); color: var(--silo-accent); font-size: 20px; cursor: default; }
+  .linkbtn { padding: 6px 0; border: 0; background: transparent; color: var(--silo-text-2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: 13px; }
+  .linkbtn:hover { color: var(--silo-text); }
+
+  /* ---- connexion ---- */
+  .login { position: absolute; top: var(--silo-topbar-h); right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 52px; box-sizing: border-box; }
+  .login .title { margin-top: 22px; font-size: 64px; }
+
+  /* ---- accueil ---- */
+  .teaser { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 12px 0 10px; border: 1px solid rgba(236,228,214,0.14); background: rgba(15,14,12,0.55); color: var(--silo-text); font-size: 13px; text-decoration: none; }
+  .teaser:hover { background: rgba(15,14,12,0.8); }
+  .status { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--silo-text-2); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--silo-ok); }
+
+  /* ---- lancement ---- */
+  .launch .col { flex: 1; max-width: 560px; align-items: stretch; }
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .level { font: 500 16px var(--silo-font-display); letter-spacing: 0.12em; font-variant-numeric: tabular-nums; color: var(--silo-accent); }
+  .track { position: relative; height: 8px; }
+  .track::before { content: ""; position: absolute; top: 3px; right: 0; left: 0; height: 2px; background: rgba(236,228,214,0.14); }
+  .track::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-right: 1px solid rgba(236,228,214,0.3);
+    background: repeating-linear-gradient(90deg, rgba(236,228,214,0.3) 0, rgba(236,228,214,0.3) 1px, transparent 1px, transparent calc(100% / 12)); }
+  .fill { position: absolute; top: 3px; left: 0; height: 2px; width: 0; background: var(--silo-accent); z-index: 1; }
+  .log { position: absolute; right: var(--silo-margin); bottom: 140px; width: 320px; box-sizing: border-box; padding: 12px 14px; display: none; flex-direction: column; gap: 6px;
+    background: rgba(15,14,12,0.92); border: 1px solid var(--silo-line); font: 12px var(--silo-font-mono); color: var(--silo-text-2); }
+  .log.open { display: flex; }
+  .log div { display: flex; gap: 10px; white-space: nowrap; overflow: hidden; }
+  .log b { font-weight: 400; color: var(--silo-ok); }
+  .log span:last-child { color: var(--silo-text); overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---- bulletin ---- */
+  .posts { position: absolute; bottom: 36px; left: var(--silo-margin); width: 360px; display: flex; flex-direction: column; }
+  .post { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 12px 0; border: 0; border-top: 1px solid var(--silo-line); background: transparent; text-align: left; cursor: pointer; }
+  .post:hover { background: rgba(236,228,214,0.04); }
+  .post .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--silo-text-2); }
+  .post .meta i { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+  .post .ttl { font-size: 15px; font-weight: 500; color: #B3AB9E; }
+  .post[aria-current="true"] .meta i { background: var(--silo-accent); }
+  .post[aria-current="true"] .ttl { color: var(--silo-text); }
+  .article { position: absolute; top: var(--silo-topbar-h); right: 0; bottom: 0; width: 480px; box-sizing: border-box; padding: 40px 44px; overflow: auto;
+    background: var(--silo-panel-solid); border-top: 1px solid rgba(236,228,214,0.1); border-left: 1px solid rgba(236,228,214,0.1); }
+  .article h2 { margin: 14px 0 22px; font: 600 34px/1.05 var(--silo-font-display); letter-spacing: 0.04em; text-transform: uppercase; }
+  .article p { margin: 0 0 14px; font-size: 15px; line-height: 1.6; color: #D2CABC; }
+  .article .when { margin: 0; font-size: 13px; color: var(--silo-text-2); }
+
+  /* ---- paramètres ---- */
+  .drawer { position: absolute; top: var(--silo-topbar-h); right: 0; bottom: 0; width: 400px; box-sizing: border-box; display: flex; flex-direction: column;
+    background: var(--silo-panel); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-top: 1px solid var(--silo-line); border-left: 1px solid var(--silo-line); }
+  .drawer header { display: flex; align-items: center; justify-content: space-between; height: 60px; padding: 0 16px 0 28px; flex-shrink: 0; }
+  .drawer h2 { margin: 0; font: 600 20px var(--silo-font-display); letter-spacing: 0.18em; }
+  .drawer .body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; padding: 0 28px; }
+  .field { display: flex; flex-direction: column; gap: 10px; padding: 14px 0 16px; border-top: 1px solid rgba(236,228,214,0.08); }
+  .field.inline { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; cursor: pointer; }
+  .field label, .field .lbl { font-size: 14px; color: var(--silo-text); }
+  .val { font: 600 18px var(--silo-font-display); font-variant-numeric: tabular-nums; color: var(--silo-accent); }
+  .field input[type="range"] { width: 100%; margin: 0; accent-color: var(--silo-accent); }
+  .field input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; accent-color: var(--silo-accent); }
+  .field select { flex: 1; min-width: 0; height: 40px; padding: 0 10px; background: rgba(20,23,28,0.85); color: var(--silo-text); border: 1px solid rgba(236,228,214,0.18); font-size: 14px; }
+  .drawer footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 28px; border-top: 1px solid rgba(236,228,214,0.08); flex-shrink: 0; font-size: 12px; color: var(--silo-text-2); }
+  .drawer footer a { color: var(--silo-text-2); text-underline-offset: 3px; }
+  .mono { font-family: var(--silo-font-mono); font-size: 12px; color: var(--silo-text-2); }
+</style>
+</head>
+<body>
+<div class="app" id="app" data-screen="connexion">
+  <div class="bg" id="bg"></div>
+  <div class="shade" aria-hidden="true"></div>
+
+  <!-- CONNEXION -->
+  <section class="view" data-view="connexion" aria-label="Connexion">
+    <div class="login">
+      <svg width="40" height="40" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="none" stroke="#ECE4D6" stroke-opacity="0.7" stroke-width="0.8"/><circle cx="10" cy="10" r="5.2" fill="none" stroke="#ECE4D6" stroke-opacity="0.7" stroke-width="0.8"/><circle cx="10" cy="10" r="1.7" fill="#E3A341"/></svg>
+      <h1 class="title">SILO</h1>
+      <p style="margin: 16px 0 0; font-size: 15px; color: #B3AB9E">Identifiez-vous pour entrer dans le silo.</p>
+      <button class="play" style="margin-top: 32px; width: 300px; height: 56px; font-size: 18px; letter-spacing: 0.2em" data-go="accueil">CONNEXION MICROSOFT</button>
+      <p class="small" style="margin: 14px 0 0">Une fenêtre Microsoft va s’ouvrir pour la connexion.</p>
+    </div>
+  </section>
+
+  <!-- ACCUEIL -->
+  <section class="view" data-view="accueil" aria-label="Accueil">
+    <div class="bottom">
+      <div class="col">
+        <a class="teaser" href="#bulletin" data-go="bulletin">
+          <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: var(--silo-accent)"></span>
+          <span class="muted">Bulletin n°12</span><span>Réouverture des niveaux Mechanical</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="muted"><path d="M2 6h8M6.5 2.5 10 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <div>
+          <h1 class="title">SILO</h1>
+          <p style="margin: 12px 0 0; font-size: 15px" class="muted">Roleplay de survie souterraine</p>
+        </div>
+        <p class="status"><span class="dot" aria-hidden="true"></span><span style="color: var(--silo-text)">En ligne</span><span aria-hidden="true">·</span><span><b style="font-weight: 500; color: var(--silo-text)">12</b> / 40 habitants</span><span aria-hidden="true">·</span><span>Forge 1.20.1</span></p>
+      </div>
+      <div class="side">
+        <button class="play" data-go="lancement">JOUER</button>
+        <span class="small">À jour · Java 17 · 6 Go</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- LANCEMENT -->
+  <section class="view launch" data-view="lancement" aria-label="Lancement">
+    <div class="log" id="log" role="log" aria-label="Journal de lancement"></div>
+    <div class="bottom">
+      <div class="col">
+        <p class="small" style="margin: 0; font-size: 13px">Le Pacte, article 1&nbsp;: on n’évoque pas l’extérieur.</p>
+        <h1 class="title">SILO</h1>
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div class="row"><span role="status" id="step" style="font-size: 15px">Vérification de Java 17</span><span class="level" id="level">Niveau 000 / 144</span></div>
+          <div class="track" role="progressbar" aria-label="Progression du lancement" aria-valuemin="0" aria-valuemax="144" aria-valuenow="0" id="track"><div class="fill" id="fill"></div></div>
+          <div class="row" style="align-items: center; font-size: 13px"><span class="muted" id="files" style="font-variant-numeric: tabular-nums">0 / 1 204 fichiers</span><button class="linkbtn" id="logbtn" aria-expanded="false">Voir le journal</button></div>
+        </div>
+      </div>
+      <div class="side">
+        <button class="ghost" id="cancel" data-go="accueil">ANNULER</button>
+        <button class="play ingame" id="ingame" disabled hidden>EN JEU</button>
+        <span class="small">Forge 47.4.29 · Java 17</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- BULLETIN -->
+  <section class="view" data-view="bulletin" aria-label="Bulletin">
+    <nav class="posts" aria-label="Bulletins">
+      <p class="small" style="margin: 0 0 8px; font-size: 13px">Derniers bulletins</p>
+      <div id="posts"></div>
+    </nav>
+    <article class="article" id="article"></article>
+  </section>
+
+  <!-- PARAMÈTRES -->
+  <section class="view" data-view="parametres" aria-label="Paramètres">
+    <aside class="drawer" aria-label="Paramètres">
+      <header>
+        <h2>PARAMÈTRES</h2>
+        <a class="wc" href="#accueil" data-go="accueil" aria-label="Fermer les paramètres" style="width: 44px; height: 44px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></a>
+      </header>
+      <div class="body">
+        <div class="field">
+          <div class="row"><label for="ram">Mémoire allouée</label><span class="val"><span id="ramv">6</span> Go</span></div>
+          <input id="ram" type="range" min="2" max="16" step="1" value="6">
+          <span class="small">Recommandé pour le modpack&nbsp;: 6 à 8 Go.</span>
+        </div>
+        <div class="field">
+          <label for="res">Résolution du jeu</label>
+          <div style="display: flex; align-items: center; gap: 16px">
+            <select id="res"><option>1280 × 720</option><option>1600 × 900</option><option>1920 × 1080</option></select>
+            <label style="display: flex; align-items: center; gap: 8px; min-height: 44px; color: #B3AB9E; cursor: pointer"><input type="checkbox" style="width: 16px; height: 16px">Plein écran</label>
+          </div>
+        </div>
+        <div class="field inline" style="cursor: default">
+          <div style="display: flex; flex-direction: column; gap: 4px"><span class="lbl">Java</span><span class="small">Java 17, détecté automatiquement</span></div>
+          <button class="linkbtn">Modifier</button>
+        </div>
+        <div class="field inline" style="cursor: default">
+          <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span class="lbl">Dossier du jeu</span><span class="mono">%APPDATA%\.silo</span></div>
+          <button class="linkbtn">Ouvrir</button>
+        </div>
+        <label class="field inline"><span class="lbl">Fond animé</span><input type="checkbox" id="anim" checked></label>
+        <label class="field inline"><span class="lbl">Fermer le launcher quand le jeu démarre</span><input type="checkbox" checked></label>
+      </div>
+      <footer><span>Silo Launcher 0.1.0</span><span style="display: flex; gap: 16px"><a href="#">Discord</a><a href="#">YouTube</a></span></footer>
+    </aside>
+  </section>
+
+  <!-- BARRE DU HAUT -->
+  <header class="topbar">
+    <nav class="nav" aria-label="Navigation principale">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="none" stroke="#ECE4D6" stroke-opacity="0.7" stroke-width="1.2"/><circle cx="10" cy="10" r="5.2" fill="none" stroke="#ECE4D6" stroke-opacity="0.7" stroke-width="1.2"/><circle cx="10" cy="10" r="1.7" fill="#E3A341"/></svg>
+      <a class="nav-link" href="#accueil" data-go="accueil" data-nav="accueil">Accueil</a>
+      <a class="nav-link" href="#bulletin" data-go="bulletin" data-nav="bulletin">Bulletin</a>
+      <a class="nav-link" href="#parametres" data-go="parametres" data-nav="parametres">Paramètres</a>
+    </nav>
+    <div class="win">
+      <button class="chip" type="button"><span class="avatar"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 14c.8-2.8 3-4.2 5.5-4.2s4.7 1.4 5.5 4.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>Opérateur_0451</button>
+      <span class="sep" aria-hidden="true"></span>
+      <button class="wc" type="button" aria-label="Réduire"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+      <button class="wc wc-close" type="button" aria-label="Fermer"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+    </div>
+  </header>
+</div>
+
+<script src="engine/silo-ps1.js"></script>
+<script src="engine/silo-background.js"></script>
+<script>
+(function () {
+  'use strict';
+  var app = document.getElementById('app');
+  var bg = window.SiloBackground(document.getElementById('bg'));
+  var $ = function (id) { return document.getElementById(id); };
+  var animOn = true;
+
+  // ---- navigation : chaque menu a sa salle, le fond suit ----
+  function go(name) {
+    app.dataset.screen = name;
+    var tab = name === 'lancement' ? 'accueil' : name;
+    document.querySelectorAll('[data-nav]').forEach(function (a) {
+      if (a.dataset.nav === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    bg.show(name);
+    if (name === 'lancement') startLaunch(); else stopLaunch();
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-go]');
+    if (t) { e.preventDefault(); go(t.dataset.go); }
+  });
+
+  // ---- lancement : la progression pilote la vitesse de descente ; le fond se met en pause pendant la partie ----
+  var STEPS = [[0, 'Vérification de Java 17'], [0.1, 'Téléchargement des bibliothèques'], [0.32, 'Téléchargement des assets'], [0.7, 'Synchronisation des mods'], [0.9, 'Démarrage de Minecraft']];
+  var LOGS = [[0, '01:58:40', 'Java 17 détecté'], [0.1, '01:58:41', 'Bibliothèques : 86 fichiers'], [0.32, '01:58:44', 'Assets Minecraft 1.20.1'],
+              [0.7, '01:58:49', 'Mods synchronisés (Forge 47.4.29)'], [0.9, '01:58:51', 'Processus Minecraft démarré'], [1, '01:58:52', 'C’est prêt. Bon jeu.']];
+  var lvl = 0, timer = 0;
+  var fmt = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
+  function renderLaunch() {
+    var l = Math.min(lvl, 144), pct = l / 144, done = l >= 144, step = STEPS[0][1];
+    STEPS.forEach(function (s) { if (pct >= s[0]) step = s[1]; });
+    $('step').textContent = done ? 'C’est prêt. Bon jeu.' : step;
+    $('level').textContent = 'Niveau ' + String(l).padStart(3, '0') + ' / 144';
+    $('fill').style.width = (pct * 100).toFixed(2) + '%';
+    $('track').setAttribute('aria-valuenow', l);
+    $('files').textContent = fmt(Math.round(pct * 1204)) + ' / ' + fmt(1204) + ' fichiers';
+    $('log').innerHTML = LOGS.filter(function (g) { return pct >= g[0]; })
+      .map(function (g) { return '<div><span>' + g[1] + '</span><b>OK</b><span>' + g[2] + '</span></div>'; }).join('');
+    $('cancel').hidden = done;
+    $('ingame').hidden = !done;
+  }
+  function startLaunch() { stopLaunch(); lvl = 0; renderLaunch(); timer = setInterval(tick, 70); }
+  function stopLaunch() { if (timer) clearInterval(timer); timer = 0; }
+  function tick() {
+    lvl++;
+    if (lvl <= 144) { bg.setSpeed(lvl >= 144 ? 0.35 : 1 + (lvl / 144) * 5); renderLaunch(); }
+    if (lvl === 158) bg.pause();                                   // le jeu tourne : plus aucune image calculée
+    if (lvl === 230) { if (animOn) bg.resume(); go('accueil'); }   // le jeu est fermé : retour à l'accueil
+  }
+  $('logbtn').addEventListener('click', function () {
+    var open = $('log').classList.toggle('open');
+    this.setAttribute('aria-expanded', open);
+    this.textContent = open ? 'Masquer le journal' : 'Voir le journal';
+  });
+
+  // ---- bulletin ----
+  var POSTS = [
+    { num: '12', date: '18 nov.', when: '18 novembre', title: 'Réouverture des niveaux Mechanical', body: ['Les niveaux 128 à 144 sont de nouveau accessibles. Les générateurs ont été remis en route, mais l’éclairage reste instable sous le niveau 130 : prévoyez une lampe.', 'Le modpack passe en Forge 47.4.29. Le launcher s’occupe de la mise à jour au prochain lancement.'] },
+    { num: '11', date: '9 nov.', when: '9 novembre', title: 'Nouveau règlement du marché', body: ['Les échanges entre étages passent désormais par les porteurs. Les prix de référence sont affichés au niveau 72.'] },
+    { num: '10', date: '27 oct.', when: '27 octobre', title: 'Maintenance du serveur', body: ['Le serveur sera coupé dimanche de 9 h à 11 h pour une mise à jour de Forge. Les inventaires sont sauvegardés avant l’arrêt.'] },
+    { num: '09', date: '14 oct.', when: '14 octobre', title: 'Le département IT recrute', body: ['Trois joueurs sont recherchés pour encadrer les archives. Les candidatures se font sur le Discord.'] }
+  ];
+  var esc = function (t) { return t.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  function renderBulletin(sel) {
+    $('posts').innerHTML = POSTS.map(function (p, i) {
+      return '<button class="post" type="button" data-post="' + i + '" aria-current="' + (i === sel) + '"><span class="meta"><i aria-hidden="true"></i>' + p.date + ' · n°' + p.num + '</span><span class="ttl">' + esc(p.title) + '</span></button>';
+    }).join('');
+    var p = POSTS[sel];
+    $('article').innerHTML = '<p class="when">Bulletin n°' + p.num + ' · ' + p.when + '</p><h2>' + esc(p.title) + '</h2>' + p.body.map(function (b) { return '<p>' + esc(b) + '</p>'; }).join('');
+  }
+  $('posts').addEventListener('click', function (e) { var b = e.target.closest('[data-post]'); if (b) renderBulletin(+b.dataset.post); });
+  renderBulletin(0);
+
+  // ---- paramètres ----
+  $('ram').addEventListener('input', function () { $('ramv').textContent = this.value; });
+  $('anim').addEventListener('change', function () { animOn = this.checked; if (animOn) bg.resume(); else bg.pause(); });
+
+  go('connexion');
+})();
+</script>
+</body>
+</html>

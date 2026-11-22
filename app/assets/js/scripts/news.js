@@ -1,57 +1,112 @@
 /**
- * Script for news.ejs - the markdown patch-notes panel. Doesn't fetch
- * anything itself: landing.js owns the /news.json check (it runs at
- * startup regardless of which view is active) and calls into
- * renderNewsContent()/toggleNewsPanel() here once the player opens it.
+ * Script for news.ejs - the Bulletin view. Doesn't fetch anything itself:
+ * landing.js owns the /news.json check and hands the markdown over through
+ * setBulletins().
+ *
+ * The backend serves a single markdown document. Each `## ` heading starts
+ * one bulletin (newest first); text before the first heading, or a document
+ * without any heading, becomes a single untitled bulletin.
  */
 const marked = require('marked')
 
-const newsPanelContainer = document.getElementById('newsPanelContainer')
-const newsPanelContent   = document.getElementById('newsPanelContent')
-const newsPanelEmpty     = document.getElementById('newsPanelEmpty')
-const newsPanelClose     = document.getElementById('newsPanelClose')
+const newsList    = document.getElementById('newsList')
+const newsArticle = document.getElementById('newsArticle')
+const newsEmpty   = document.getElementById('newsEmpty')
+
+let bulletins = []
+let bulletinSelected = 0
+
+function escapeBulletinText(text){
+    return text.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+}
 
 /**
- * Render raw markdown into the panel body. Empty/whitespace-only content
- * shows the "nothing here yet" placeholder instead of a blank panel.
+ * Split the backend markdown into bulletins.
  *
  * @param {string} markdown Raw markdown, as returned by /news.json.
+ * @returns {{num: number, title: string, body: string}[]} Newest first.
  */
-function renderNewsContent(markdown){
-    if(markdown && markdown.trim().length > 0){
-        newsPanelContent.innerHTML = marked.parse(markdown)
-        newsPanelContent.style.display = 'block'
-        newsPanelEmpty.style.display = 'none'
-    } else {
-        newsPanelContent.style.display = 'none'
-        newsPanelEmpty.style.display = 'block'
+function parseBulletins(markdown){
+    if(!markdown || markdown.trim().length === 0){
+        return []
     }
+    const parts = []
+    let current = null
+    let preamble = []
+    for(const line of markdown.split(/\r?\n/)){
+        const m = /^##\s+(.+?)\s*#*\s*$/.exec(line)
+        if(m){
+            current = { title: m[1], lines: [] }
+            parts.push(current)
+        } else if(current){
+            current.lines.push(line)
+        } else {
+            preamble.push(line)
+        }
+    }
+    const preambleText = preamble.join('\n').trim()
+    if(parts.length === 0){
+        parts.push({ title: Lang.queryJS('news.untitled'), lines: preamble })
+    } else if(preambleText.length > 0){
+        parts[0].lines.unshift(preambleText, '')
+    }
+    return parts.map((p, i) => ({
+        num: parts.length - i,
+        title: p.title,
+        body: p.lines.join('\n').trim()
+    }))
+}
+
+function renderBulletins(){
+    const hasAny = bulletins.length > 0
+    newsEmpty.hidden = hasAny
+    newsList.parentElement.hidden = !hasAny
+    newsArticle.hidden = !hasAny
+    if(!hasAny){
+        newsList.innerHTML = ''
+        newsArticle.innerHTML = ''
+        return
+    }
+    newsList.innerHTML = bulletins.map((b, i) => `<button class="post" type="button" data-post="${i}" aria-current="${i === bulletinSelected}">
+            <span class="meta"><i aria-hidden="true"></i>${Lang.queryJS('news.number', { num: b.num })}</span>
+            <span class="ttl">${escapeBulletinText(b.title)}</span>
+        </button>`).join('')
+    const b = bulletins[bulletinSelected]
+    newsArticle.innerHTML = `<p class="when">${Lang.queryJS('news.number', { num: b.num })}</p>
+        <h2>${escapeBulletinText(b.title)}</h2>
+        <div class="articleBody">${marked.parse(b.body)}</div>`
+    newsArticle.scrollTop = 0
 }
 
 /**
- * Show/hide the news panel, blurring #main the same way the confirm
- * overlay (overlay.js) already does while it's open.
+ * Replace the bulletins shown in the view (and in the home teaser).
  *
- * @param {boolean} show True to open the panel, false to close it.
+ * @param {string} markdown Raw markdown from /news.json.
+ * @param {boolean} unread Whether the latest content hasn't been opened yet.
  */
-function toggleNewsPanel(show){
-    if(show){
-        document.getElementById('main').setAttribute('overlay', true)
-        $('#newsPanelContainer').fadeIn(250)
+function setBulletins(markdown, unread){
+    bulletins = parseBulletins(markdown)
+    bulletinSelected = 0
+    renderBulletins()
+
+    const teaser = document.getElementById('newsTeaser')
+    if(bulletins.length > 0){
+        document.getElementById('newsTeaserNum').textContent = Lang.queryJS('news.number', { num: bulletins[0].num })
+        document.getElementById('newsTeaserTitle').textContent = bulletins[0].title
+        teaser.toggleAttribute('unread', !!unread)
+        teaser.hidden = false
     } else {
-        document.getElementById('main').removeAttribute('overlay')
-        $('#newsPanelContainer').fadeOut(250)
+        teaser.hidden = true
     }
 }
 
-newsPanelClose.addEventListener('click', () => toggleNewsPanel(false))
-newsPanelContainer.addEventListener('click', e => {
-    if(e.target === newsPanelContainer){
-        toggleNewsPanel(false)
+newsList.addEventListener('click', e => {
+    const btn = e.target.closest('[data-post]')
+    if(btn){
+        bulletinSelected = Number(btn.getAttribute('data-post'))
+        renderBulletins()
+        newsList.querySelector(`[data-post="${bulletinSelected}"]`)?.focus()
     }
 })
-document.addEventListener('keydown', e => {
-    if(e.key === 'Escape' && newsPanelContainer.style.display !== 'none'){
-        toggleNewsPanel(false)
-    }
-})
+
+renderBulletins()

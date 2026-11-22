@@ -1,6 +1,5 @@
 const loginOptionsCancelContainer = document.getElementById('loginOptionCancelContainer')
 const loginOptionMicrosoft = document.getElementById('loginOptionMicrosoft')
-const loginOptionMojang = document.getElementById('loginOptionMojang')
 const loginOptionsCancelButton = document.getElementById('loginOptionCancelButton')
 
 let loginOptionsCancellable = false
@@ -19,7 +18,7 @@ function loginOptionsCancelEnabled(val){
 }
 
 loginOptionMicrosoft.onclick = (e) => {
-    switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
+    switchView(getCurrentView(), VIEWS.waiting, 200, 200, () => {
         ipcRenderer.send(
             MSFT_OPCODE.OPEN_LOGIN,
             loginOptionsViewOnLoginSuccess,
@@ -28,16 +27,12 @@ loginOptionMicrosoft.onclick = (e) => {
     })
 }
 
-loginOptionMojang.onclick = (e) => {
-    switchView(getCurrentView(), VIEWS.login, 500, 500, () => {
-        loginViewOnSuccess = loginOptionsViewOnLoginSuccess
-        loginViewOnCancel = loginOptionsViewOnLoginCancel
-        loginCancelEnabled(true)
-    })
-}
+// Mojang accounts no longer exist (all migrated to Microsoft): only the
+// Microsoft button is offered. login.ejs/login.js stay loaded because other
+// scripts still clear or prefill its fields.
 
 loginOptionsCancelButton.onclick = (e) => {
-    switchView(getCurrentView(), loginOptionsViewOnCancel, 500, 500, () => {
+    switchView(getCurrentView(), loginOptionsViewOnCancel, 200, 200, () => {
         // Clear login values (Mojang login)
         // No cleanup needed for Microsoft.
         loginUsername.value = ''

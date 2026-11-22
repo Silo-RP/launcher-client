@@ -24,68 +24,168 @@ const { SYNC_URL }    = require('./assets/js/launcherConfig')
 const newsManager              = require('./assets/js/newsManager')
 
 // Launch Elements
+const landingContainer        = document.getElementById('landingContainer')
 const launch_content          = document.getElementById('launch_content')
 const launch_button           = document.getElementById('launch_button')
 const launch_details          = document.getElementById('launch_details')
 const launch_progress         = document.getElementById('launch_progress')
+const launch_fill             = document.getElementById('launch_fill')
+const launch_level            = document.getElementById('launch_level')
 const launch_progress_label   = document.getElementById('launch_progress_label')
 const launch_details_text     = document.getElementById('launch_details_text')
-const server_selection_button = document.getElementById('server_selection_button')
+const launch_state            = document.getElementById('launch_state')
+const launch_log              = document.getElementById('launch_log')
+const launch_log_toggle       = document.getElementById('launch_log_toggle')
 const user_text               = document.getElementById('user_text')
-
-// News Elements
-const newsButtonContainer     = document.getElementById('newsButtonContainer')
-const newsButton              = document.getElementById('newsButton')
 
 const loggerLanding = LoggerUtil.getLogger('Landing')
 
 /* Launch Progress Wrapper Functions */
 
+// The launch runs several independent stages, each reporting its own 0-100%.
+// They are mapped onto one monotonic progress, shown as "Niveau 087 / 144"
+// (the silo's 144 levels) and used to speed up the stairs descent.
+const LAUNCH_LEVELS = 144
+const LAUNCH_PHASES = {
+    validate: [0, 0.12],
+    vanilla:  [0.12, 0.42],
+    java:     [0.42, 0.52],
+    forge:    [0.52, 0.66],
+    files:    [0.66, 0.96],
+    start:    [0.96, 1]
+}
+let launchPhase = 'validate'
+let launchProgress = 0
+let launchFile = ''
+let launchLogLines = []
+
 /**
- * Show/hide the loading area. launch_content (the JOUER button + server
- * label) and launch_details (the progress bar) occupy the same slot -
- * exactly one of them is visible at a time, so the progress bar replaces
- * the button instead of appearing as an extra row underneath it.
+ * Switch the home screen between its resting state and the launch state.
+ * The launch state replaces the JOUER button with the progress block.
  *
  * @param {boolean} loading True if the loading area should be shown, otherwise false.
  */
 function toggleLaunchArea(loading){
     if(loading){
         launch_button.disabled = true
-        server_selection_button.disabled = true
-        launch_content.style.display = 'none'
-        launch_details.style.display = 'flex'
+        launchPhase = 'validate'
+        launchProgress = 0
+        launchFile = ''
+        launchLogLines = []
+        renderLaunchLog()
+        setLaunchState('preparing')
+        landingContainer.setAttribute('data-mode', 'lancement')
+        renderLaunchProgress()
     } else {
-        launch_details.style.display = 'none'
-        launch_content.style.display = 'inline-flex'
-        server_selection_button.disabled = false
+        landingContainer.setAttribute('data-mode', 'accueil')
+        setLaunchLogOpen(false)
         setLaunchEnabled(ConfigManager.getSelectedServer() != null)
+        siloSetLaunchSpeed(null)
+    }
+    if(getCurrentView() === VIEWS.landing){
+        siloOnView(VIEWS.landing)
     }
 }
 
 /**
- * Set the details text of the loading area.
- * 
+ * Right-hand state button while launching: LANCEMENT (preparing) or
+ * EN JEU (the game process is running). Never clickable.
+ *
+ * @param {'preparing'|'ingame'} state The state to show.
+ */
+function setLaunchState(state){
+    launch_state.setAttribute('data-state', state)
+    launch_state.innerHTML = state === 'ingame'
+        ? Lang.queryJS('landing.launchState.ingame')
+        : Lang.queryJS('landing.launchState.preparing')
+}
+
+/**
+ * Set the details text of the loading area, and log it in the journal.
+ *
  * @param {string} details The new text for the loading details.
  */
 function setLaunchDetails(details){
     launch_details_text.innerHTML = details
+    launchFile = ''
+    const text = launch_details_text.textContent
+    if(launchLogLines.length === 0 || launchLogLines[launchLogLines.length-1].text !== text){
+        launchLogLines.forEach(l => { if(l.status === 'run') l.status = 'ok' })
+        launchLogLines.push({ time: new Date().toLocaleTimeString('fr-FR'), text, status: 'run' })
+        renderLaunchLog()
+    }
+    renderLaunchProgress()
 }
 
 /**
- * Set the value of the loading progress bar and display that value.
- * 
+ * Show the file currently being downloaded under the progress bar.
+ *
+ * @param {string} file The file name.
+ */
+function setLaunchFile(file){
+    launchFile = file || ''
+    renderLaunchProgress()
+}
+
+/**
+ * Start a new launch stage: its 0-100% maps onto the stage's slice of the
+ * overall progress.
+ *
+ * @param {string} phase A key of LAUNCH_PHASES.
+ */
+function setLaunchPhase(phase){
+    launchPhase = phase
+    setLaunchPercentage(0)
+}
+
+/**
+ * Set the progress of the current stage.
+ *
  * @param {number} percent Percentage (0-100)
  */
 function setLaunchPercentage(percent){
-    launch_progress.setAttribute('max', 100)
-    launch_progress.setAttribute('value', percent)
-    launch_progress_label.innerHTML = percent + '%'
+    const [from, to] = LAUNCH_PHASES[launchPhase] || LAUNCH_PHASES.validate
+    const p = Math.min(100, Math.max(0, Number(percent) || 0)) / 100
+    launchProgress = Math.max(launchProgress, from + (to - from) * p)
+    renderLaunchProgress()
+    siloSetLaunchSpeed(launchProgress)
 }
+
+function renderLaunchProgress(){
+    const level = Math.round(launchProgress * LAUNCH_LEVELS)
+    launch_level.textContent = Lang.queryJS('landing.level', { level: String(level).padStart(3, '0'), total: LAUNCH_LEVELS })
+    launch_fill.style.width = (launchProgress * 100).toFixed(2) + '%'
+    launch_progress.setAttribute('aria-valuenow', level)
+    const percent = Math.round(launchProgress * 100) + ' %'
+    launch_progress_label.textContent = launchFile ? `${percent} · ${launchFile}` : percent
+}
+
+function renderLaunchLog(){
+    launch_log.replaceChildren(...launchLogLines.map(l => {
+        const row = document.createElement('div')
+        const time = document.createElement('span')
+        const status = document.createElement('b')
+        const text = document.createElement('span')
+        time.textContent = l.time
+        status.textContent = Lang.queryJS(`landing.logStatus.${l.status}`)
+        status.setAttribute('data-status', l.status)
+        text.textContent = l.text
+        row.append(time, status, text)
+        return row
+    }))
+    launch_log.scrollTop = launch_log.scrollHeight
+}
+
+function setLaunchLogOpen(open){
+    launch_log.hidden = !open
+    launch_log_toggle.setAttribute('aria-expanded', open)
+    launch_log_toggle.innerHTML = open ? Lang.queryJS('landing.hideLog') : Lang.queryJS('landing.showLog')
+}
+launch_log_toggle.addEventListener('click', () => setLaunchLogOpen(launch_log.hidden))
 
 /**
  * Set the value of the OS progress bar and display that on the UI.
- * 
+ *
  * @param {number} percent Percentage (0-100)
  */
 function setDownloadPercentage(percent){
@@ -95,11 +195,11 @@ function setDownloadPercentage(percent){
 
 /**
  * Enable or disable the launch button.
- * 
+ *
  * @param {boolean} val True to enable, false to disable.
  */
 function setLaunchEnabled(val){
-    launch_button.disabled = !val
+    launch_button.disabled = !val || proc != null
 }
 
 // Bind launch button
@@ -116,17 +216,6 @@ launch_button.addEventListener('click', async e => {
     }
 })
 
-// Bind settings button
-document.getElementById('settingsMediaButton').onclick = async e => {
-    await prepareSettings()
-    switchView(getCurrentView(), VIEWS.settings)
-}
-
-// Bind DevTools button - quick access without needing to remember the shortcut.
-document.getElementById('devToolsMediaButton').onclick = () => {
-    remote.getCurrentWindow().toggleDevTools()
-}
-
 // Bind selected account
 function updateSelectedAccount(authUser){
     let username = Lang.queryJS('landing.selectedAccount.noAccountSelected')
@@ -139,6 +228,33 @@ function updateSelectedAccount(authUser){
 }
 updateSelectedAccount(ConfigManager.getSelectedAccount())
 
+// Server details shown on the home screen (name, tagline, versions).
+let landingServer = null
+
+/**
+ * Refresh the line under the JOUER button: Forge version and allocated memory.
+ */
+function refreshLandingMeta(){
+    const parts = []
+    if(landingServer?.rawServer.forgeVersion){
+        parts.push(Lang.queryJS('landing.meta.forge', { version: landingServer.rawServer.forgeVersion }))
+    }
+    const servId = ConfigManager.getSelectedServer()
+    let maxRam = null
+    try {
+        // Throws until ensureJavaSettings() created this server's entry
+        // (first launch: the distribution is still loading).
+        maxRam = servId != null ? ConfigManager.getMaxRAM(servId) : null
+    } catch {
+        maxRam = null
+    }
+    if(maxRam){
+        const gb = maxRam.endsWith('M') ? Number(maxRam.slice(0, -1)) / 1024 : Number.parseFloat(maxRam)
+        parts.push(formatRamGo(gb))
+    }
+    document.getElementById('landingMeta').textContent = parts.join(' · ')
+}
+
 // Bind selected server
 function updateSelectedServer(serv){
     if(getCurrentView() === VIEWS.settings){
@@ -146,107 +262,63 @@ function updateSelectedServer(serv){
     }
     ConfigManager.setSelectedServer(serv != null ? serv.rawServer.id : null)
     ConfigManager.save()
-    server_selection_button.innerHTML = '&#8226; ' + (serv != null ? serv.rawServer.name : Lang.queryJS('landing.noSelection'))
+    landingServer = serv
+    if(serv != null){
+        document.getElementById('landingTitle').textContent = serv.rawServer.name || Lang.queryEJS('landing.title')
+        if(serv.rawServer.description){
+            document.getElementById('landingTagline').textContent = serv.rawServer.description
+        }
+        const version = document.getElementById('landingVersion')
+        version.textContent = Lang.queryJS('landing.serverStatus.version', { version: serv.rawServer.minecraftVersion })
+        version.hidden = !serv.rawServer.minecraftVersion
+    }
+    refreshLandingMeta()
     if(getCurrentView() === VIEWS.settings){
         animateSettingsTabRefresh()
     }
     setLaunchEnabled(serv != null)
 }
-// Real text is set in uibinder.js on distributionIndexDone.
-server_selection_button.innerHTML = '&#8226; ' + Lang.queryJS('landing.selectedServer.loading')
-server_selection_button.onclick = async e => {
-    e.target.blur()
-    await toggleServerSelection(true)
-}
 
-// Update Mojang Status Color
+// Mojang status: only surfaced when an essential service is down.
 const refreshMojangStatuses = async function(){
     loggerLanding.info('Refreshing Mojang Statuses..')
 
-    let status = 'grey'
-    let tooltipEssentialHTML = ''
-    let tooltipNonEssentialHTML = ''
-
     const response = await MojangRestAPI.status()
-    let statuses
-    if(response.responseStatus === RestResponseStatus.SUCCESS) {
-        statuses = response.data
-    } else {
+    if(response.responseStatus !== RestResponseStatus.SUCCESS) {
         loggerLanding.warn('Unable to refresh Mojang service status.')
-        statuses = MojangRestAPI.getDefaultStatuses()
-    }
-    
-    greenCount = 0
-    greyCount = 0
-
-    for(let i=0; i<statuses.length; i++){
-        const service = statuses[i]
-
-        const tooltipHTML = `<div class="mojangStatusContainer">
-            <span class="mojangStatusIcon" style="color: ${MojangRestAPI.statusToHex(service.status)};">&#8226;</span>
-            <span class="mojangStatusName">${service.name}</span>
-        </div>`
-        if(service.essential){
-            tooltipEssentialHTML += tooltipHTML
-        } else {
-            tooltipNonEssentialHTML += tooltipHTML
-        }
-
-        if(service.status === 'yellow' && status !== 'red'){
-            status = 'yellow'
-        } else if(service.status === 'red'){
-            status = 'red'
-        } else {
-            if(service.status === 'grey'){
-                ++greyCount
-            }
-            ++greenCount
-        }
-
+        siloSetBanner('mojang', null)
+        return
     }
 
-    if(greenCount === statuses.length){
-        if(greyCount === statuses.length){
-            status = 'grey'
-        } else {
-            status = 'green'
-        }
-    }
-    
-    document.getElementById('mojangStatusEssentialContainer').innerHTML = tooltipEssentialHTML
-    document.getElementById('mojangStatusNonEssentialContainer').innerHTML = tooltipNonEssentialHTML
-    document.getElementById('mojang_status_icon').style.color = MojangRestAPI.statusToHex(status)
+    const down = response.data.filter(service => service.essential && service.status === 'red')
+    siloSetBanner('mojang', down.length > 0
+        ? Lang.queryJS('landing.mojangOutage', { services: down.map(s => s.name).join(', ') })
+        : null)
 }
 
 const refreshServerStatus = async (fade = false) => {
     loggerLanding.info('Refreshing Server Status')
     const serv = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
 
-    let pLabel = Lang.queryJS('landing.serverStatus.server')
-    let pVal = Lang.queryJS('landing.serverStatus.offline')
+    let online = false
+    let players = null
 
     try {
-
         const servStat = await getServerStatus(47, serv.hostname, serv.port)
-        console.log(servStat)
-        pLabel = Lang.queryJS('landing.serverStatus.players')
-        pVal = servStat.players.online + '/' + servStat.players.max
-
+        online = true
+        players = Lang.queryJS('landing.serverStatus.players', { online: servStat.players.online, max: servStat.players.max })
     } catch (err) {
         loggerLanding.warn('Unable to refresh server status, assuming offline.')
         loggerLanding.debug(err)
     }
-    if(fade){
-        $('#server_status_wrapper').fadeOut(250, () => {
-            document.getElementById('landingPlayerLabel').innerHTML = pLabel
-            document.getElementById('player_count').innerHTML = pVal
-            $('#server_status_wrapper').fadeIn(500)
-        })
-    } else {
-        document.getElementById('landingPlayerLabel').innerHTML = pLabel
-        document.getElementById('player_count').innerHTML = pVal
-    }
-    
+
+    document.getElementById('server_status_wrapper').setAttribute('data-online', online)
+    document.getElementById('landingPlayerLabel').innerHTML = online
+        ? Lang.queryJS('landing.serverStatus.online')
+        : Lang.queryJS('landing.serverStatus.offline')
+    const count = document.getElementById('player_count')
+    count.innerHTML = players || ''
+    count.hidden = players == null
 }
 
 refreshMojangStatuses()
@@ -259,15 +331,13 @@ let serverStatusListener = setInterval(() => refreshServerStatus(true), 300000)
 
 /* News */
 
-// Raw markdown + its hash from the last successful /news.json fetch, kept
-// in memory so clicking the button doesn't need a second network round
-// trip - refreshNews() already has it.
-let newsContentCache = null
+// Hash of the last successful /news.json fetch, to remember it as read once
+// the Bulletin view has been opened.
 let newsHash = null
 
 /**
  * Check silo-sync for news, independent of login/server-selection state
- * (same idea as refreshMojangStatuses above) - so the unread indicator is
+ * (same idea as refreshMojangStatuses above) - so the home teaser is
  * already correct by the time the player sees the landing view.
  */
 async function refreshNews(){
@@ -278,30 +348,30 @@ async function refreshNews(){
         loggerLanding.warn('Unable to fetch news.', err)
         return
     }
-    newsContentCache = news.content
     newsHash = news.hash
 
     const hasContent = news.content != null && news.content.trim().length > 0
     const seen = ConfigManager.getNewsCache()
-    if(hasContent && (seen.date !== news.hash || !seen.dismissed)){
-        newsButtonContainer.setAttribute('unread', true)
-    }
+    setBulletins(news.content, hasContent && (seen.date !== news.hash || !seen.dismissed))
 }
 refreshNews()
 
-newsButton.addEventListener('click', () => {
-    renderNewsContent(newsContentCache)
-    toggleNewsPanel(true)
-    newsButtonContainer.removeAttribute('unread')
+/**
+ * Remember the current news as read (called when the Bulletin view opens).
+ */
+function markNewsRead(){
+    document.getElementById('newsTeaser').removeAttribute('unread')
     if(newsHash != null){
         ConfigManager.setNewsCache({ date: newsHash, content: null, dismissed: true })
         ConfigManager.save()
     }
-})
+}
+
+document.getElementById('newsTeaser').addEventListener('click', () => siloNavigate('bulletin'))
 
 /**
  * Shows an error overlay, toggles off the launch area.
- * 
+ *
  * @param {string} title The overlay title.
  * @param {string} desc The overlay description.
  */
@@ -313,7 +383,9 @@ function showLaunchFailure(title, desc){
     )
     setOverlayHandler(null)
     toggleOverlay(true)
-    toggleLaunchArea(false)
+    if(proc == null){
+        toggleLaunchArea(false)
+    }
 }
 
 // Keep reference to Minecraft Process
@@ -338,6 +410,9 @@ async function dlAsync(login = true) {
 
     const loggerLaunchSuite = LoggerUtil.getLogger('LaunchSuite')
 
+    // Switch to the launch screen right away (the distribution refresh
+    // below can take a moment); every early failure switches back.
+    toggleLaunchArea(true)
     setLaunchDetails(Lang.queryJS('landing.dlAsync.loadingServerInfo'))
 
     let distro
@@ -364,10 +439,6 @@ async function dlAsync(login = true) {
         return
     }
 
-    setLaunchDetails(Lang.queryJS('landing.dlAsync.pleaseWait'))
-    toggleLaunchArea(true)
-    setLaunchPercentage(0, 100)
-
     // Vanilla Minecraft assets only (mods/config/Forge/Java are entirely
     // handled by syncClient below) - no more FullRepair/DistributionIndexProcessor,
     // which required a distribution.json-backed modules list to avoid throwing
@@ -378,6 +449,7 @@ async function dlAsync(login = true) {
 
     loggerLaunchSuite.info('Validating files.')
     setLaunchDetails(Lang.queryJS('landing.dlAsync.validatingFileIntegrity'))
+    setLaunchPhase('validate')
     let invalidAssets
     try {
         await repairMojangProcessor.init()
@@ -397,8 +469,8 @@ async function dlAsync(login = true) {
 
     if(invalidAssets.length > 0) {
         loggerLaunchSuite.info('Downloading files.')
-        setLaunchDetails(Lang.queryJS('landing.dlAsync.downloadingFiles'))
-        setLaunchPercentage(0)
+        setLaunchDetails(Lang.queryJS('landing.dlAsync.downloadingMinecraft'))
+        setLaunchPhase('vanilla')
         try {
             const expectedTotalSize = getExpectedDownloadSize(invalidAssets)
             let currentPercent = 0
@@ -417,6 +489,8 @@ async function dlAsync(login = true) {
         }
     } else {
         loggerLaunchSuite.info('No invalid vanilla files.')
+        setLaunchPhase('vanilla')
+        setLaunchPercentage(100)
     }
 
     // Remove download bar.
@@ -438,18 +512,18 @@ async function dlAsync(login = true) {
         // silo-sync: Java, Forge (installed for real, locally), and
         // mods/config/resourcepacks via forced/download/ignore rules -
         // replaces what DistributionIndexProcessor/Nebula used to do.
-        setLaunchDetails(Lang.queryJS('landing.dlAsync.pleaseWait'))
         const commonDir = ConfigManager.getCommonDirectory()
         const instancesRoot = ConfigManager.getInstanceDirectory()
         const instanceDir = ConfigManager.getServerInstanceDirectory(serv.rawServer.id)
 
         const onDlProgress = ({ file, percent }) => {
-            setLaunchDetails(Lang.queryJS('landing.dlAsync.downloadingFile', { file }))
+            setLaunchFile(file)
             setDownloadPercentage(percent)
         }
 
         const syncConfig = await syncClient.fetchConfig(SYNC_URL, ConfigManager.getSelectedAccount()?.uuid)
-        setDownloadPercentage(0)
+        setLaunchDetails(Lang.queryJS('landing.dlAsync.preparingJava'))
+        setLaunchPhase('java')
         const javaPath = await syncClient.ensureJava(syncConfig.java, commonDir, onDlProgress)
         // ProcessBuilder spawns whatever ConfigManager.getJavaExecutable()
         // holds for this server - it knows nothing about syncClient. Without
@@ -457,12 +531,13 @@ async function dlAsync(login = true) {
         // nonexistent value instead of the Java we just ensured is present.
         ConfigManager.setJavaExecutable(serv.rawServer.id, javaPath)
         ConfigManager.save()
-        setDownloadPercentage(0)
+        setLaunchDetails(Lang.queryJS('landing.dlAsync.installingForge'))
+        setLaunchPhase('forge')
         const forgeVersionJsonPath = await syncClient.ensureForge(
             syncConfig.forge, javaPath, instanceDir, commonDir, onDlProgress)
         const enabledAddons = ConfigManager.getAddonConfiguration(serv.rawServer.id)?.enabled || []
-        setLaunchDetails(Lang.queryJS('landing.dlAsync.downloadingFiles'))
-        setDownloadPercentage(0)
+        setLaunchDetails(Lang.queryJS('landing.dlAsync.syncingServerFiles'))
+        setLaunchPhase('files')
         await syncClient.syncFiles(syncConfig, instanceDir, enabledAddons, onDlProgress)
 
         modLoaderData = await fs.readJson(forgeVersionJsonPath)
@@ -488,6 +563,7 @@ async function dlAsync(login = true) {
         loggerLaunchSuite.info(`Sending selected account (${authUser.displayName}) to ProcessBuilder.`)
         let pb = new ProcessBuilder(realServ, versionData, modLoaderData, authUser, remote.app.getVersion())
         setLaunchDetails(Lang.queryJS('landing.dlAsync.launchingGame'))
+        setLaunchPhase('start')
 
         const onLoadComplete = () => {
             if(loadCompleteHandled){
@@ -498,7 +574,10 @@ async function dlAsync(login = true) {
                 clearTimeout(launchUiFallbackTimer)
                 launchUiFallbackTimer = null
             }
-            toggleLaunchArea(false)
+            if(proc == null){
+                toggleLaunchArea(false)
+                return
+            }
             if(proc.stdout != null){
                 proc.stdout.removeListener('data', tempListener)
             }
@@ -599,13 +678,21 @@ async function dlAsync(login = true) {
                     )
                 }
                 proc = null
+                loggerLaunchSuite.info('Minecraft process exited.')
+                siloSetGameRunning(false)
+                toggleLaunchArea(false)
             })
 
+            setLaunchPercentage(100)
             setLaunchDetails(Lang.queryJS('landing.dlAsync.doneEnjoyServer'))
+            setLaunchState('ingame')
+            siloSetGameRunning(true)
 
         } catch(err) {
 
             loggerLaunchSuite.error('Error during launch', err)
+            proc = null
+            siloSetGameRunning(false)
             showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringLaunchTitle'), Lang.queryJS('landing.dlAsync.checkConsoleForDetails'))
 
         }

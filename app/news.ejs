@@ -1,13 +1,12 @@
-<div id="newsPanelContainer" style="display: none;">
-    <div id="newsPanel">
-        <div id="newsPanelHeader">
-            <span id="newsPanelTitle"><%- lang('landing.newsPanelTitle') %></span>
-            <button id="newsPanelClose">&times;</button>
-        </div>
-        <div id="newsPanelBody">
-            <div id="newsPanelContent"></div>
-            <div id="newsPanelEmpty" style="display: none;"><%- lang('landing.newsPanelEmpty') %></div>
-        </div>
+<section id="newsContainer" class="view" style="display: none;" aria-label="<%- lang('frame.navBulletin') %>">
+    <nav class="posts" aria-label="<%- lang('news.listLabel') %>">
+        <p class="small postsTitle"><%- lang('news.listTitle') %></p>
+        <div id="newsList"></div>
+    </nav>
+    <article class="article" id="newsArticle" tabindex="-1"></article>
+    <div class="newsEmpty" id="newsEmpty" hidden>
+        <h2><%- lang('news.emptyTitle') %></h2>
+        <p class="muted"><%- lang('news.emptyText') %></p>
     </div>
     <script src="./assets/js/scripts/news.js"></script>
-</div>
+</section>

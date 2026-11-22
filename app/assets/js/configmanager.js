@@ -104,11 +104,13 @@ const DEFAULT_CONFIG = {
             resHeight: 720,
             fullscreen: false,
             autoConnect: true,
-            launchDetached: true
+            launchDetached: true,
+            minimizeOnLaunch: false
         },
         launcher: {
             allowPrerelease: false,
-            dataDirectory: dataPath
+            dataDirectory: dataPath,
+            animatedBackground: true
         }
     },
     newsCache: {
@@ -842,7 +844,46 @@ exports.setLaunchDetached = function(launchDetached){
     config.settings.game.launchDetached = launchDetached
 }
 
+/**
+ * Check if the launcher window should be minimized while the game runs
+ * (it is restored when the game exits).
+ *
+ * @param {boolean} def Optional. If true, the default value will be returned.
+ * @returns {boolean} Whether or not the launcher is minimized during a game session.
+ */
+exports.getMinimizeOnLaunch = function(def = false){
+    return !def ? config.settings.game.minimizeOnLaunch : DEFAULT_CONFIG.settings.game.minimizeOnLaunch
+}
+
+/**
+ * Change whether the launcher window should be minimized while the game runs.
+ *
+ * @param {boolean} minimizeOnLaunch Whether or not to minimize the launcher during a game session.
+ */
+exports.setMinimizeOnLaunch = function(minimizeOnLaunch){
+    config.settings.game.minimizeOnLaunch = minimizeOnLaunch
+}
+
 // Launcher Settings
+
+/**
+ * Check if the 3D background is animated ("Fond animé").
+ *
+ * @param {boolean} def Optional. If true, the default value will be returned.
+ * @returns {boolean} Whether or not the background is animated.
+ */
+exports.getAnimatedBackground = function(def = false){
+    return !def ? config.settings.launcher.animatedBackground : DEFAULT_CONFIG.settings.launcher.animatedBackground
+}
+
+/**
+ * Change whether the 3D background is animated.
+ *
+ * @param {boolean} animatedBackground Whether or not the background is animated.
+ */
+exports.setAnimatedBackground = function(animatedBackground){
+    config.settings.launcher.animatedBackground = animatedBackground
+}
 
 /**
  * Check if the launcher should download prerelease versions.

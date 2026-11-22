@@ -72,6 +72,16 @@ function bindFileSelectors(){
 
 bindFileSelectors()
 
+// Open the game folder in the system file explorer.
+document.getElementById('settingsOpenDataDir').onclick = () => {
+    shell.openPath(ConfigManager.getDataDirectory())
+}
+
+// "Fond animé" applies right away; it is persisted with the other settings.
+document.getElementById('settingsAnimatedBackground').addEventListener('change', e => {
+    siloSetAnimatedBackground(e.target.checked)
+})
+
 
 /**
  * General Settings Functions
@@ -227,84 +237,6 @@ function saveSettingsValues(){
     }
 }
 
-let selectedSettingsTab = 'settingsTabAccount'
-
-/**
- * Modify the settings container UI when the scroll threshold reaches
- * a certain poin.
- * 
- * @param {UIEvent} e The scroll event.
- */
-function settingsTabScrollListener(e){
-    if(e.target.scrollTop > Number.parseFloat(getComputedStyle(e.target.firstElementChild).marginTop)){
-        document.getElementById('settingsContainer').setAttribute('scrolled', '')
-    } else {
-        document.getElementById('settingsContainer').removeAttribute('scrolled')
-    }
-}
-
-/**
- * Bind functionality for the settings navigation items.
- */
-function setupSettingsTabs(){
-    Array.from(document.getElementsByClassName('settingsNavItem')).map((val) => {
-        if(val.hasAttribute('rSc')){
-            val.onclick = () => {
-                settingsNavItemListener(val)
-            }
-        }
-    })
-}
-
-/**
- * Settings nav item onclick lisener. Function is exposed so that
- * other UI elements can quickly toggle to a certain tab from other views.
- * 
- * @param {Element} ele The nav item which has been clicked.
- * @param {boolean} fade Optional. True to fade transition.
- */
-function settingsNavItemListener(ele, fade = true){
-    if(ele.hasAttribute('selected')){
-        return
-    }
-    const navItems = document.getElementsByClassName('settingsNavItem')
-    for(let i=0; i<navItems.length; i++){
-        if(navItems[i].hasAttribute('selected')){
-            navItems[i].removeAttribute('selected')
-        }
-    }
-    ele.setAttribute('selected', '')
-    let prevTab = selectedSettingsTab
-    selectedSettingsTab = ele.getAttribute('rSc')
-
-    document.getElementById(prevTab).onscroll = null
-    document.getElementById(selectedSettingsTab).onscroll = settingsTabScrollListener
-
-    if(fade){
-        $(`#${prevTab}`).fadeOut(250, () => {
-            $(`#${selectedSettingsTab}`).fadeIn({
-                duration: 250,
-                start: () => {
-                    settingsTabScrollListener({
-                        target: document.getElementById(selectedSettingsTab)
-                    })
-                }
-            })
-        })
-    } else {
-        $(`#${prevTab}`).hide(0, () => {
-            $(`#${selectedSettingsTab}`).show({
-                duration: 0,
-                start: () => {
-                    settingsTabScrollListener({
-                        target: document.getElementById(selectedSettingsTab)
-                    })
-                }
-            })
-        })
-    }
-}
-
 const settingsNavDone = document.getElementById('settingsNavDone')
 
 /**
@@ -356,10 +288,19 @@ settingsNavDone.onclick = () => {
 const msftLoginLogger = LoggerUtil.getLogger('Microsoft Login')
 const msftLogoutLogger = LoggerUtil.getLogger('Microsoft Logout')
 
+// The account menu lives in the top bar, so add/log out flows return to
+// whichever main view was open when they started.
+let accountFlowReturnView = null
+function accountFlowView(){
+    return accountFlowReturnView || VIEWS.landing
+}
+
 // Bind the add microsoft account button.
 document.getElementById('settingsAddMicrosoftAccount').onclick = (e) => {
-    switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
-        ipcRenderer.send(MSFT_OPCODE.OPEN_LOGIN, VIEWS.settings, VIEWS.settings)
+    closeAccountMenu()
+    accountFlowReturnView = getCurrentView()
+    switchView(getCurrentView(), VIEWS.waiting, 200, 200, () => {
+        ipcRenderer.send(MSFT_OPCODE.OPEN_LOGIN, accountFlowView(), accountFlowView())
     })
 }
 
@@ -518,9 +459,11 @@ function processLogOut(val, isLastAccount){
     const uuid = parent.getAttribute('uuid')
     const prevSelAcc = ConfigManager.getSelectedAccount()
     const targetAcc = ConfigManager.getAuthAccount(uuid)
+    closeAccountMenu()
     if(targetAcc.type === 'microsoft') {
         msAccDomElementCache = parent
-        switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
+        accountFlowReturnView = getCurrentView()
+        switchView(getCurrentView(), VIEWS.waiting, 200, 200, () => {
             ipcRenderer.send(MSFT_OPCODE.OPEN_LOGOUT, uuid, isLastAccount)
         })
     } else {
@@ -533,7 +476,7 @@ function processLogOut(val, isLastAccount){
             }
             if(isLastAccount) {
                 loginOptionsCancelEnabled(false)
-                loginOptionsViewOnLoginSuccess = VIEWS.settings
+                loginOptionsViewOnLoginSuccess = VIEWS.landing
                 loginOptionsViewOnLoginCancel = VIEWS.loginOptions
                 switchView(getCurrentView(), VIEWS.loginOptions)
             }
@@ -547,7 +490,7 @@ function processLogOut(val, isLastAccount){
 // Bind reply for Microsoft Logout.
 ipcRenderer.on(MSFT_OPCODE.REPLY_LOGOUT, (_, ...arguments_) => {
     if (arguments_[0] === MSFT_REPLY_TYPE.ERROR) {
-        switchView(getCurrentView(), VIEWS.settings, 500, 500, () => {
+        switchView(getCurrentView(), accountFlowView(), 200, 200, () => {
 
             if(arguments_.length > 1 && arguments_[1] === MSFT_ERROR.NOT_FINISHED) {
                 // User cancelled.
@@ -584,7 +527,7 @@ ipcRenderer.on(MSFT_OPCODE.REPLY_LOGOUT, (_, ...arguments_) => {
                 }
                 if(isLastAccount) {
                     loginOptionsCancelEnabled(false)
-                    loginOptionsViewOnLoginSuccess = VIEWS.settings
+                    loginOptionsViewOnLoginSuccess = VIEWS.landing
                     loginOptionsViewOnLoginCancel = VIEWS.loginOptions
                     switchView(getCurrentView(), VIEWS.loginOptions)
                 }
@@ -595,7 +538,7 @@ ipcRenderer.on(MSFT_OPCODE.REPLY_LOGOUT, (_, ...arguments_) => {
             })
             .finally(() => {
                 if(!isLastAccount) {
-                    switchView(getCurrentView(), VIEWS.settings, 500, 500)
+                    switchView(getCurrentView(), accountFlowView(), 200, 200)
                 }
             })
 
@@ -642,27 +585,9 @@ function populateAuthAccounts(){
         const acc = authAccounts[val]
 
         const accHtml = `<div class="settingsAuthAccount" uuid="${acc.uuid}">
-            <div class="settingsAuthAccountLeft">
-                <img class="settingsAuthAccountImage" alt="${acc.displayName}" src="https://mc-heads.net/body/${acc.uuid}/60">
-            </div>
-            <div class="settingsAuthAccountRight">
-                <div class="settingsAuthAccountDetails">
-                    <div class="settingsAuthAccountDetailPane">
-                        <div class="settingsAuthAccountDetailTitle">${Lang.queryJS('settings.authAccountPopulate.username')}</div>
-                        <div class="settingsAuthAccountDetailValue">${acc.displayName}</div>
-                    </div>
-                    <div class="settingsAuthAccountDetailPane">
-                        <div class="settingsAuthAccountDetailTitle">${Lang.queryJS('settings.authAccountPopulate.uuid')}</div>
-                        <div class="settingsAuthAccountDetailValue">${acc.uuid}</div>
-                    </div>
-                </div>
-                <div class="settingsAuthAccountActions">
-                    <button class="settingsAuthAccountSelect" ${selectedUUID === acc.uuid ? 'selected>' + Lang.queryJS('settings.authAccountPopulate.selectedAccount') : '>' + Lang.queryJS('settings.authAccountPopulate.selectAccount')}</button>
-                    <div class="settingsAuthAccountWrapper">
-                        <button class="settingsAuthAccountLogOut">${Lang.queryJS('settings.authAccountPopulate.logout')}</button>
-                    </div>
-                </div>
-            </div>
+            <span class="settingsAuthAccountName">${acc.displayName}</span>
+            <button type="button" class="linkbtn settingsAuthAccountSelect" ${selectedUUID === acc.uuid ? 'selected>' + Lang.queryJS('settings.authAccountPopulate.selectedAccount') : '>' + Lang.queryJS('settings.authAccountPopulate.selectAccount')}</button>
+            <button type="button" class="linkbtn settingsAuthAccountLogOut">${Lang.queryJS('settings.authAccountPopulate.logout')}</button>
         </div>`
 
         microsoftAuthAccountStr += accHtml
@@ -698,58 +623,12 @@ document.getElementById('settingsGameHeight').addEventListener('keydown', (e) =>
     }
 })
 
-// Server status bar functions - shared by every tab with a
-// .settingsSelServContent bar (Addons, Java...), not just one specific tab.
-
 /**
- * Load the currently selected server information into every
- * .settingsSelServContent bar currently in the DOM.
- */
-async function refreshSelServContent(){
-    const serv = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
-
-    for(const el of document.getElementsByClassName('settingsSelServContent')) {
-        el.innerHTML = `
-            <img class="serverListingImg" src="${serv.rawServer.icon || 'assets/images/logo.png'}"/>
-            <div class="serverListingDetails">
-                <span class="serverListingName">${serv.rawServer.name}</span>
-                <span class="serverListingDescription">${serv.rawServer.description}</span>
-                <div class="serverListingInfo">
-                    <div class="serverListingVersion">${serv.rawServer.minecraftVersion}</div>
-                    <div class="serverListingRevision">${serv.rawServer.version}</div>
-                    ${serv.rawServer.mainServer ? `<div class="serverListingStarWrapper">
-                        <svg id="Layer_1" viewBox="0 0 107.45 104.74" width="20px" height="20px">
-                            <defs>
-                                <style>.cls-1{fill:#fff;}.cls-2{fill:none;stroke:#fff;stroke-miterlimit:10;}</style>
-                            </defs>
-                            <path class="cls-1" d="M100.93,65.54C89,62,68.18,55.65,63.54,52.13c2.7-5.23,18.8-19.2,28-27.55C81.36,31.74,63.74,43.87,58.09,45.3c-2.41-5.37-3.61-26.52-4.37-39-.77,12.46-2,33.64-4.36,39-5.7-1.46-23.3-13.57-33.49-20.72,9.26,8.37,25.39,22.36,28,27.55C39.21,55.68,18.47,62,6.52,65.55c12.32-2,33.63-6.06,39.34-4.9-.16,5.87-8.41,26.16-13.11,37.69,6.1-10.89,16.52-30.16,21-33.9,4.5,3.79,14.93,23.09,21,34C70,86.84,61.73,66.48,61.59,60.65,67.36,59.49,88.64,63.52,100.93,65.54Z"/>
-                            <circle class="cls-2" cx="53.73" cy="53.9" r="38"/>
-                        </svg>
-                        <span class="serverListingStarTooltip">${Lang.queryJS('settings.serverListing.mainServer')}</span>
-                    </div>` : ''}
-                </div>
-            </div>
-        `
-    }
-}
-
-// Bind functionality to the server switch button.
-Array.from(document.getElementsByClassName('settingsSwitchServerButton')).forEach(el => {
-    el.addEventListener('click', async e => {
-        e.target.blur()
-        await toggleServerSelection(true)
-    })
-})
-
-/**
- * Function to refresh the current tab whenever the selected
- * server is changed.
+ * Re-read the settings when the selected server changes while the drawer
+ * is open (per-server values such as memory and JVM options).
  */
 function animateSettingsTabRefresh(){
-    $(`#${selectedSettingsTab}`).fadeOut(500, async () => {
-        await prepareSettings()
-        $(`#${selectedSettingsTab}`).fadeIn(500)
-    })
+    prepareSettings()
 }
 
 /**
@@ -958,11 +837,11 @@ settingsMinRAMRange.onchange = (e) => {
 
     // Change range bar color based on the selected value.
     if(sMinV >= max/2){
-        bar.style.background = '#e86060'
+        bar.setAttribute('data-level', 'high')
     } else if(sMinV >= max/4) {
-        bar.style.background = '#e8e18b'
+        bar.setAttribute('data-level', 'mid')
     } else {
-        bar.style.background = null
+        bar.removeAttribute('data-level')
     }
 
     // Increase maximum memory if the minimum exceeds its value.
@@ -970,11 +849,11 @@ settingsMinRAMRange.onchange = (e) => {
         const sliderMeta = calculateRangeSliderMeta(settingsMaxRAMRange)
         updateRangedSlider(settingsMaxRAMRange, sMinV,
             ((sMinV-sliderMeta.min)/sliderMeta.step)*sliderMeta.inc)
-        settingsMaxRAMLabel.innerHTML = sMinV.toFixed(1) + 'G'
+        settingsMaxRAMLabel.innerHTML = formatRamGo(sMinV)
     }
 
     // Update label
-    settingsMinRAMLabel.innerHTML = sMinV.toFixed(1) + 'G'
+    settingsMinRAMLabel.innerHTML = formatRamGo(sMinV)
 }
 
 // Bind on change event for max memory container.
@@ -990,11 +869,11 @@ settingsMaxRAMRange.onchange = (e) => {
 
     // Change range bar color based on the selected value.
     if(sMaxV >= max/2){
-        bar.style.background = '#e86060'
+        bar.setAttribute('data-level', 'high')
     } else if(sMaxV >= max/4) {
-        bar.style.background = '#e8e18b'
+        bar.setAttribute('data-level', 'mid')
     } else {
-        bar.style.background = null
+        bar.removeAttribute('data-level')
     }
 
     // Decrease the minimum memory if the maximum value is less.
@@ -1002,9 +881,20 @@ settingsMaxRAMRange.onchange = (e) => {
         const sliderMeta = calculateRangeSliderMeta(settingsMaxRAMRange)
         updateRangedSlider(settingsMinRAMRange, sMaxV,
             ((sMaxV-sliderMeta.min)/sliderMeta.step)*sliderMeta.inc)
-        settingsMinRAMLabel.innerHTML = sMaxV.toFixed(1) + 'G'
+        settingsMinRAMLabel.innerHTML = formatRamGo(sMaxV)
     }
-    settingsMaxRAMLabel.innerHTML = sMaxV.toFixed(1) + 'G'
+    settingsMaxRAMLabel.innerHTML = formatRamGo(sMaxV)
+}
+
+/**
+ * Format a memory amount in gigabytes for display: 6 -> "6 Go", 6.5 -> "6,5 Go".
+ *
+ * @param {number} gb Amount in gigabytes.
+ * @returns {string} The formatted amount.
+ */
+function formatRamGo(gb){
+    const rounded = Math.round(Number(gb) * 10) / 10
+    return Lang.queryJS('settings.memoryAmount', { amount: rounded.toLocaleString('fr-FR', { maximumFractionDigits: 1 }) })
 }
 
 /**
@@ -1040,35 +930,38 @@ function bindRangeSlider(){
 
         updateRangedSlider(v, value, ((value-sliderMeta.min)/sliderMeta.step)*sliderMeta.inc)
 
-        // The magic happens when we click on the track.
-        track.onmousedown = (e) => {
+        // Snap the value to the notch closest to a horizontal position.
+        // getBoundingClientRect: the slider sits in positioned containers,
+        // so offsetLeft is not relative to the page.
+        const moveTo = (clientX) => {
+            const rect = v.getBoundingClientRect()
+            const perc = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100))
+            const notch = Number(perc/sliderMeta.inc).toFixed(0)*sliderMeta.inc
+            if(String(sliderMeta.min+(sliderMeta.step*(notch/sliderMeta.inc))) !== v.getAttribute('value')){
+                updateRangedSlider(v, sliderMeta.min+(sliderMeta.step*(notch/sliderMeta.inc)), notch)
+            }
+        }
 
-            // Stop moving the track on mouse up.
-            document.onmouseup = (e) => {
+        // Press anywhere on the bar, then drag.
+        v.onmousedown = (e) => {
+            e.preventDefault()
+            v.focus()
+            moveTo(e.clientX)
+            document.onmousemove = (e) => moveTo(e.clientX)
+            document.onmouseup = () => {
                 document.onmousemove = null
                 document.onmouseup = null
             }
+        }
 
-            // Move slider according to the mouse position.
-            document.onmousemove = (e) => {
-
-                // Distance from the beginning of the bar in pixels.
-                const diff = e.pageX - v.offsetLeft - track.offsetWidth/2
-                
-                // Don't move the track off the bar.
-                if(diff >= 0 && diff <= v.offsetWidth-track.offsetWidth/2){
-
-                    // Convert the difference to a percentage.
-                    const perc = (diff/v.offsetWidth)*100
-                    // Calculate the percentage of the closest notch.
-                    const notch = Number(perc/sliderMeta.inc).toFixed(0)*sliderMeta.inc
-
-                    // If we're close to that notch, stick to it.
-                    if(Math.abs(perc-notch) < sliderMeta.inc/2){
-                        updateRangedSlider(v, sliderMeta.min+(sliderMeta.step*(notch/sliderMeta.inc)), notch)
-                    }
-                }
-            }
+        // Keyboard: arrows move by one step.
+        v.tabIndex = 0
+        v.onkeydown = (e) => {
+            const dir = (e.key === 'ArrowRight' || e.key === 'ArrowUp') ? 1 : (e.key === 'ArrowLeft' || e.key === 'ArrowDown') ? -1 : 0
+            if(dir === 0) return
+            e.preventDefault()
+            const next = Math.min(sliderMeta.max, Math.max(sliderMeta.min, Number(v.getAttribute('value')) + dir*sliderMeta.step))
+            updateRangedSlider(v, next, ((next-sliderMeta.min)/sliderMeta.step)*sliderMeta.inc)
         }
     }) 
 }
@@ -1105,6 +998,8 @@ function updateRangedSlider(element, value, notch){
     if(!cancelled){
         track.style.left = notch + '%'
         bar.style.width = notch + '%'
+        element.setAttribute('aria-valuenow', value)
+        element.setAttribute('aria-valuetext', formatRamGo(value))
     } else {
         element.setAttribute('value', oldVal)
     }
@@ -1114,8 +1009,8 @@ function updateRangedSlider(element, value, notch){
  * Display the total and available RAM.
  */
 function populateMemoryStatus(){
-    settingsMemoryTotal.innerHTML = Number((os.totalmem()-1073741824)/1073741824).toFixed(1) + 'G'
-    settingsMemoryAvail.innerHTML = Number(os.freemem()/1073741824).toFixed(1) + 'G'
+    settingsMemoryTotal.innerHTML = formatRamGo((os.totalmem()-1073741824)/1073741824)
+    settingsMemoryAvail.innerHTML = formatRamGo(os.freemem()/1073741824)
 }
 
 function populateJvmOptsLink(server) {
@@ -1162,11 +1057,6 @@ async function prepareJavaTab(){
  * About Tab
  */
 
-const settingsTabAbout             = document.getElementById('settingsTabAbout')
-const settingsAboutChangelogTitle  = settingsTabAbout.getElementsByClassName('settingsChangelogTitle')[0]
-const settingsAboutChangelogText   = settingsTabAbout.getElementsByClassName('settingsChangelogText')[0]
-const settingsAboutChangelogButton = settingsTabAbout.getElementsByClassName('settingsChangelogButton')[0]
-
 // Bind the devtools toggle button.
 document.getElementById('settingsAboutDevToolsButton').onclick = (e) => {
     let window = remote.getCurrentWindow()
@@ -1207,48 +1097,17 @@ function populateVersionInformation(version, valueElement, titleElement, checkEl
 }
 
 /**
- * Retrieve the version information and display it on the UI.
+ * Show the launcher version in the drawer footer.
  */
 function populateAboutVersionInformation(){
-    populateVersionInformation(remote.app.getVersion(), document.getElementById('settingsAboutCurrentVersionValue'), document.getElementById('settingsAboutCurrentVersionTitle'), document.getElementById('settingsAboutCurrentVersionCheck'))
+    document.getElementById('settingsAboutCurrentVersionValue').textContent = remote.app.getVersion()
 }
 
 /**
- * Fetches the GitHub atom release feed and parses it for the release notes
- * of the current version. This value is displayed on the UI.
- */
-function populateReleaseNotes(){
-    $.ajax({
-        url: `https://github.com/${require('./assets/js/launcherConfig').GITHUB_REPO}/releases.atom`,
-        success: (data) => {
-            const version = 'v' + remote.app.getVersion()
-            const entries = $(data).find('entry')
-            
-            for(let i=0; i<entries.length; i++){
-                const entry = $(entries[i])
-                let id = entry.find('id').text()
-                id = id.substring(id.lastIndexOf('/')+1)
-
-                if(id === version){
-                    settingsAboutChangelogTitle.innerHTML = entry.find('title').text()
-                    settingsAboutChangelogText.innerHTML = entry.find('content').text()
-                    settingsAboutChangelogButton.href = entry.find('link').attr('href')
-                }
-            }
-
-        },
-        timeout: 2500
-    }).catch(err => {
-        settingsAboutChangelogText.innerHTML = Lang.queryJS('settings.about.releaseNotesFailed')
-    })
-}
-
-/**
- * Prepare account tab for display.
+ * Prepare the about information for display.
  */
 function prepareAboutTab(){
     populateAboutVersionInformation()
-    populateReleaseNotes()
 }
 
 /**
@@ -1333,13 +1192,11 @@ function prepareUpdateTab(data = null){
   */
 async function prepareSettings(first = false) {
     if(first){
-        setupSettingsTabs()
         initSettingsValidators()
         prepareUpdateTab()
     } else {
         await prepareAddonsTab()
     }
-    await refreshSelServContent()
     await initSettingsValues()
     prepareAccountsTab()
     await prepareJavaTab()

@@ -43,6 +43,8 @@ class SyncDistroAdapter {
                 version: '1.0.0',
                 address: meta.address,
                 minecraftVersion: meta.minecraftVersion,
+                // Display only (home screen); the launch reads it from config.forge again.
+                forgeVersion: config.forge?.forgeVersion || null,
                 discord: {},
                 mainServer: true,
                 autoconnect: meta.autoconnect ?? false,

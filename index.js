@@ -127,6 +127,12 @@ ipcMain.on('window:toggleMaximize', (event) => {
 ipcMain.on('window:minimize', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()
 })
+ipcMain.on('window:restore', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if(win != null && win.isMinimized()) {
+        win.restore()
+    }
+})
 ipcMain.on('window:toggleDevTools', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.toggleDevTools()
 })
@@ -280,7 +286,8 @@ function createWindow() {
             nodeIntegration: true,
             contextIsolation: false
         },
-        backgroundColor: '#171614'
+        // Same colour as --silo-bg: shown until the 3D background fades in.
+        backgroundColor: '#0F0E0C'
     })
     win.webContents.on('devtools-opened', () => {
         win.webContents.send('devtools-opened')

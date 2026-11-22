@@ -1,0 +1,33 @@
+/*
+ * Silo Launcher — jetons de design.
+ * Polices : Barlow et Barlow Condensed (licence SIL OFL). Dans le launcher, les embarquer en local
+ * (fichiers .woff2 + @font-face) au lieu de les charger depuis Google Fonts.
+ */
+:root {
+  /* couleurs */
+  --silo-bg: #0F0E0C;             /* fond, dégradés sous le texte */
+  --silo-text: #ECE4D6;           /* texte principal */
+  --silo-text-2: #A39B8E;         /* texte secondaire (7:1 sur le fond) */
+  --silo-text-3: #8F887C;         /* mentions discrètes (5,5:1 sur le fond) */
+  --silo-accent: #E3A341;         /* ambre : bouton principal et progression UNIQUEMENT */
+  --silo-on-accent: #16130E;      /* texte sur l'ambre */
+  --silo-ok: #8DB07A;             /* point de statut « en ligne » uniquement */
+  --silo-danger: #A63D2A;         /* survol du bouton fermer, erreurs */
+  --silo-line: rgba(236, 228, 214, 0.12);   /* seuls filets autorisés */
+  --silo-panel: rgba(12, 14, 18, 0.74);     /* panneau translucide (Paramètres) + flou 8 px */
+  --silo-panel-solid: rgba(17, 16, 13, 0.94);
+
+  /* typographie */
+  --silo-font: Barlow, system-ui, sans-serif;
+  --silo-font-display: 'Barlow Condensed', sans-serif;   /* titres, bouton : capitales espacées */
+  --silo-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;   /* journal uniquement */
+
+  /* fenêtre et grille */
+  --silo-window-w: 980px;
+  --silo-window-h: 552px;
+  --silo-topbar-h: 52px;
+  --silo-margin: 40px;            /* marges de la fenêtre */
+  --silo-space: 8px;              /* grille de 8 px */
+  --silo-play-w: 236px;
+  --silo-play-h: 60px;
+}
