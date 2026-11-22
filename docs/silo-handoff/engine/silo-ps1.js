@@ -409,9 +409,11 @@
       mesh: m, fog: [0.075, 0.066, 0.055], fogRange: [8, 38], fov: 58, flick: 0.25, texPeriod: 2 * Hl,
       cam: function (ph, mode) {
         if (mode === 'void') {
-          var yv = -2 * Hl + 6 - mod(ph * 0.5, 2 * Hl), rot = ph * 0.04;
-          var ev = cyl(7.4, PI / 2, yv);
-          return { eye: ev, target: [ev[0] * 0.9, yv - 10, ev[2] * 0.9], up: [Math.cos(rot), 0, Math.sin(rot)], fog: [4, 34] };
+          // plongée dans le vide central, inclinée vers le fût : on voit les passerelles
+          // partir une fois d'un côté, une fois de l'autre, niveau après niveau
+          var yv = -2 * Hl + 6 - mod(ph * 0.5, 2 * Hl), sw = Math.sin(ph * 0.05) * 0.1;
+          var ev = cyl(10.5, PI / 2 + sw, yv);
+          return { eye: ev, target: cyl(0, PI / 2 + sw, yv - 11), up: [0, 1, 0], fog: [4, 40] };
         }
         if (mode === 'orbit') {
           // on tourne autour de l'escalier en descendant, au rythme de sa spirale
