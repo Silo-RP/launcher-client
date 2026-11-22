@@ -4,8 +4,8 @@
  * (tremblement), couleurs interpolées en affine, éclairage précalculé par sommet, béton procédural
  * en gros texels, brouillard, tramage Bayer + couleurs 15 bits, 30 images/s.
  * Vie : graine aléatoire par lancement (opts.seed), cycle jour/nuit sur l'heure réelle, fenêtres qui
- * s'allument le soir, habitants (silhouettes et passants animés), événements rares (coupure sur un
- * niveau, porte qui s'ouvre, vapeur, écrans qui grésillent), poussière dans la lumière.
+ * s'allument le soir, silhouettes d'habitants au loin sur les coursives, événements rares (coupure
+ * sur un niveau, porte qui s'ouvre, vapeur, écrans qui grésillent), poussière dans la lumière.
  * API : window.SiloPS1.mount(canvas, { scene: 'stairs'|'control'|'cafeteria', mode: 'walk'|'orbit'|'void', speed, grain, cold, seed })
  *       → { setSpeed(v), setMode(m), setLook({ grain, cold }), setNight(v|null), trigger(name), pause(), resume(), destroy() }
  */
@@ -42,10 +42,9 @@
   var FX_WIN = -1000;       // vitre de logement : -1000 - id ; allumée ou non selon l'heure (id ≥ 500 : rarement)
   var FX_DOOR = -2000;      // lumière d'une porte qui s'ouvre : -2000 - id (événement)
   var FX_DIGIT = -4000;     // chiffre peint : -4000 - (niveau * 100 + rang * 10 + segment), éclairé
-  var FX_MOVER = -7000;     // habitant animé : -7000 - (id * 10 + partie) ; partie 1/2 = jambes
   var FX_STEAM = -9000;     // particule de vapeur : -9000 - n
   var FX_DUST = -9500;      // poussière en suspension : -9500 - n
-  function isLit(fx) { return !fx || fx === LIT_PLAIN || (fx <= FX_DIGIT && fx > FX_MOVER); }
+  function isLit(fx) { return !fx || fx === LIT_PLAIN || (fx <= FX_DIGIT && fx > FX_DIGIT - 3000); }
   // bucketH : range les lumières par tranche de hauteur pour n'évaluer que les plus proches
   // layer : 0 = structure ; 1 et 2 = décors posés sur une surface (cadres, vitres, écrans…),
   // dessinés après coup avec un décalage de profondeur pour ne jamais scintiller dans le mur.
@@ -159,7 +158,7 @@
     }
   };
 
-  // ---------- habitants : silhouettes PS1 en boîtes ----------
+  // ---------- habitants : silhouettes PS1 en boîtes (fixes, au loin) ----------
   // Repère local : pieds en (0, 0, 0), regard vers +z, x à droite. Poses : debout, accoudé
   // (avant-bras posés devant soi, sur un garde-corps), assis. Les couleurs viennent d'une palette
   // tirée au hasard (vêtements délavés, peaux variées).
@@ -171,55 +170,42 @@
     return { top: CLOTH[Math.floor(r(1) * CLOTH.length)], legs: CLOTH[Math.floor(r(2) * CLOTH.length)],
              skin: SKIN[Math.floor(r(3) * SKIN.length)], hair: HAIR[Math.floor(r(4) * HAIR.length)], h: 0.92 + r(5) * 0.16 };
   }
-  // boîtes [x0, x1, y0, y1, z0, z1, couleur, partie]
-  function personBoxes(pose, look, cargo) {
+  // boîtes [x0, x1, y0, y1, z0, z1, couleur]
+  function personBoxes(pose, look) {
     var h = look.h, B = [];
     var hip = (pose === 'sit' ? 0.46 : 0.9) * h, sh = hip + 0.58 * h;
     if (pose === 'sit') {
-      B.push([-0.17, -0.03, hip, hip + 0.13, 0.0, 0.46, look.legs, 0], [0.03, 0.17, hip, hip + 0.13, 0.0, 0.46, look.legs, 0]);
-      B.push([-0.17, -0.03, 0, hip, 0.36, 0.48, look.legs, 0], [0.03, 0.17, 0, hip, 0.36, 0.48, look.legs, 0]);
+      B.push([-0.17, -0.03, hip, hip + 0.13, 0.0, 0.46, look.legs], [0.03, 0.17, hip, hip + 0.13, 0.0, 0.46, look.legs]);
+      B.push([-0.17, -0.03, 0, hip, 0.36, 0.48, look.legs], [0.03, 0.17, 0, hip, 0.36, 0.48, look.legs]);
       sh = hip + 0.13 + 0.55 * h;
-      B.push([-0.21, 0.21, hip + 0.1, sh, -0.11, 0.11, look.top, 0]);
-      B.push([-0.28, -0.21, sh - 0.3, sh - 0.02, -0.06, 0.06, look.top, 0], [0.21, 0.28, sh - 0.3, sh - 0.02, -0.06, 0.06, look.top, 0]);
-      B.push([-0.27, -0.19, sh - 0.36, sh - 0.28, 0.0, 0.34, look.top, 0], [0.19, 0.27, sh - 0.36, sh - 0.28, 0.0, 0.34, look.top, 0]);
+      B.push([-0.21, 0.21, hip + 0.1, sh, -0.11, 0.11, look.top]);
+      B.push([-0.28, -0.21, sh - 0.3, sh - 0.02, -0.06, 0.06, look.top], [0.21, 0.28, sh - 0.3, sh - 0.02, -0.06, 0.06, look.top]);
+      B.push([-0.27, -0.19, sh - 0.36, sh - 0.28, 0.0, 0.34, look.top], [0.19, 0.27, sh - 0.36, sh - 0.28, 0.0, 0.34, look.top]);
     } else {
-      B.push([-0.17, -0.03, 0, hip, -0.07, 0.07, look.legs, 1], [0.03, 0.17, 0, hip, -0.07, 0.07, look.legs, 2]);
-      B.push([-0.21, 0.21, hip, sh, -0.11, 0.11, look.top, 0]);
+      B.push([-0.17, -0.03, 0, hip, -0.07, 0.07, look.legs], [0.03, 0.17, 0, hip, -0.07, 0.07, look.legs]);
+      B.push([-0.21, 0.21, hip, sh, -0.11, 0.11, look.top]);
       if (pose === 'lean') {
-        B.push([-0.28, -0.2, sh - 0.42, sh - 0.02, -0.04, 0.1, look.top, 0], [0.2, 0.28, sh - 0.42, sh - 0.02, -0.04, 0.1, look.top, 0]);
-        B.push([-0.27, -0.19, sh - 0.44, sh - 0.36, 0.08, 0.38, look.top, 0], [0.19, 0.27, sh - 0.44, sh - 0.36, 0.08, 0.38, look.top, 0]);
+        B.push([-0.28, -0.2, sh - 0.42, sh - 0.02, -0.04, 0.1, look.top], [0.2, 0.28, sh - 0.42, sh - 0.02, -0.04, 0.1, look.top]);
+        B.push([-0.27, -0.19, sh - 0.44, sh - 0.36, 0.08, 0.38, look.top], [0.19, 0.27, sh - 0.44, sh - 0.36, 0.08, 0.38, look.top]);
       } else {
-        B.push([-0.29, -0.21, hip - 0.02, sh - 0.02, -0.06, 0.06, look.top, 0], [0.21, 0.29, hip - 0.02, sh - 0.02, -0.06, 0.06, look.top, 0]);
+        B.push([-0.29, -0.21, hip - 0.02, sh - 0.02, -0.06, 0.06, look.top], [0.21, 0.29, hip - 0.02, sh - 0.02, -0.06, 0.06, look.top]);
       }
     }
-    B.push([-0.05, 0.05, sh, sh + 0.05, -0.05, 0.05, look.skin, 0]);
-    B.push([-0.1, 0.1, sh + 0.05, sh + 0.25, -0.1, 0.1, look.skin, 0]);
-    B.push([-0.105, 0.105, sh + 0.2, sh + 0.28, -0.11, 0.08, look.hair, 0]);
-    if (cargo) {
-      // porteur : cadre de portage et chargement sur le dos
-      B.push([-0.23, 0.23, hip + 0.05, sh + 0.35, -0.48, -0.12, hexc('#6b5638'), 0]);
-      B.push([-0.25, 0.25, sh + 0.35, sh + 0.42, -0.5, -0.1, hexc('#3d3a34'), 0]);
-      B.push([-0.2, -0.15, hip + 0.2, sh, -0.13, 0.12, hexc('#2d2a25'), 0], [0.15, 0.2, hip + 0.2, sh, -0.13, 0.12, hexc('#2d2a25'), 0]);
-    }
+    B.push([-0.05, 0.05, sh, sh + 0.05, -0.05, 0.05, look.skin]);
+    B.push([-0.1, 0.1, sh + 0.05, sh + 0.25, -0.1, 0.1, look.skin]);
+    B.push([-0.105, 0.105, sh + 0.2, sh + 0.28, -0.11, 0.08, look.hair]);
     return B;
   }
   // silhouette fixe, posée dans la scène (éclairée comme le reste)
   function bakePerson(m, pos, yaw, pose, look) {
     var c = Math.cos(yaw), sn = Math.sin(yaw);
     var W = function (x, yy, z) { return [pos[0] + x * c - z * sn, pos[1] + yy, pos[2] + x * sn + z * c]; };
-    personBoxes(pose, look, false).forEach(function (b) {
+    personBoxes(pose, look).forEach(function (b) {
       m.hexa([W(b[0], b[2], b[4]), W(b[1], b[2], b[4]), W(b[1], b[2], b[5]), W(b[0], b[2], b[5]),
               W(b[0], b[3], b[4]), W(b[1], b[3], b[4]), W(b[1], b[3], b[5]), W(b[0], b[3], b[5])], b[6], LIT_PLAIN);
     });
   }
-  // habitant animé : géométrie en repère local, placée chaque image par le vertex shader (uMovA/uMovB)
-  function moverPerson(m, id, look, cargo) {
-    personBoxes('stand', look, cargo).forEach(function (b) {
-      m.hexa([[b[0], b[2], b[4]], [b[1], b[2], b[4]], [b[1], b[2], b[5]], [b[0], b[2], b[5]],
-              [b[0], b[3], b[4]], [b[1], b[3], b[4]], [b[1], b[3], b[5]], [b[0], b[3], b[5]]], b[6], FX_MOVER - (id * 10 + b[7]));
-    });
-  }
-  // cap (lacet) pour regarder/marcher selon la direction (dx, dz) du monde
+  // cap (lacet) pour regarder selon la direction (dx, dz) du monde
   function yawTo(dx, dz) { return Math.atan2(-dx, dz); }
 
   // chiffre peint au pochoir (7 segments), dans un plan donné par un point et deux axes u (droite)
@@ -745,9 +731,6 @@
       for (k = K0; k < K1; k++) lantern(cc, colA(j), -k * Hl - 0.08, lanternState(k, j), profOf(k) === 'mech' ? 0.86 : 1 - lv(k, 210 + j) * 0.06);
     }
 
-    // habitants animés : 0 = porteur (chargement sur le dos), 1-3 = passants sur les coursives
-    moverPerson(m, 0, personLook(function (n) { return rnd(880 + n); }), true);
-    for (j = 1; j <= 3; j++) moverPerson(m, j, personLook((function (jj) { return function (n) { return rnd(890 + jj * 10 + n); }; })(j)), false);
     steamCloud(m, function (n) { return rnd(1200 + n); }, 70);
 
     // ---- marche « humaine » : le rythme varie, on s'arrête à certains paliers, on regarde autour ----
@@ -774,8 +757,7 @@
     var base0 = 20 + Math.floor(rnd(920) * 60);   // numéro peint du niveau 0 de la géométrie
     function voidY(ph) { return -2 * Hl + 6 - mod(ph * 0.5, PER * Hl); }
 
-    // ---- passants, porteur et événements ----
-    var porter = null, walkers = [null, null, null], lastT = 0, lastLoop = null, nextPorter = 8 + rnd(930) * 20;
+    // ---- événements rares, près de la caméra ----
     var ctx = { k: 2, a: A0, mode: 'walk' };
     function context(ph, mode) {
       if (mode === 'void') {
@@ -801,45 +783,8 @@
     var sched = Scheduler(rnd, ['level', 'door', 'steam', 'door']);
 
     function update(time, ph, mode, nightK) {
-      var dt = Math.min(0.2, Math.max(0, time - lastT)); lastT = time;
       ctx = context(ph, mode);
-      // boucle de caméra : tout ce qui suit la caméra remonte avec elle (8 niveaux)
-      if (lastLoop != null && ctx.loop !== lastLoop) {
-        var dl = ctx.loop - lastLoop;
-        if (porter) porter.a -= dl * ROT;
-        walkers.forEach(function (w) { if (w) w.k -= dl * PER; });
-      }
-      lastLoop = ctx.loop;
-      var out = { movers: [] };
-
-      // porteur qui monte l'escalier et croise la caméra (côté pilier)
-      if (!porter && time > nextPorter) {
-        porter = { a: (ctx.a == null ? TH(ctx.k + 2) + 1.0 : ctx.a + 2.6), born: time };
-      }
-      if (porter) {
-        porter.a -= 0.15 * dt;
-        var gone = time - porter.born > (ctx.mode === 'void' ? 45 : 40) || (ctx.a != null && porter.a < ctx.a - 1.4);
-        if (gone) { porter = null; nextPorter = time + 50 + rnd(940 + Math.floor(time)) * 60; }
-      }
-      if (porter) {
-        var pa = porter.a, pp2 = cyl(2.45, pa, sAvg(pa));
-        out.movers[0] = { x: pp2[0], y: pp2[1], z: pp2[2], yaw: yawTo(Math.sin(pa), -Math.cos(pa)), step: time * 6.5, bob: Math.abs(Math.sin(time * 6.5)) * 0.03, on: true, light: 0.55 * (1 - 0.3 * nightK) };
-      } else out.movers[0] = { on: false, x: 0, y: 0, z: 0, yaw: 0 };
-
-      // passants sur les coursives d'en dessous
-      for (var wi2 = 0; wi2 < 3; wi2++) {
-        var w = walkers[wi2];
-        if (w && (time > w.end || w.k < ctx.k)) { walkers[wi2] = w = null; }
-        if (!w && rnd(1000 + Math.floor(time * 0.5) * 3 + wi2) < 0.04 * (1 - 0.5 * nightK)) {
-          w = walkers[wi2] = { k: ctx.k + 1 + Math.floor(rnd(1001 + Math.floor(time) + wi2) * 2), ang: rnd(1002 + Math.floor(time) + wi2) * TAU,
-                               dir: rnd(1003 + Math.floor(time) + wi2) < 0.5 ? -1 : 1, end: time + 35 + rnd(1004 + wi2) * 30, ph: rnd(1005 + wi2) * 6 };
-        }
-        if (w) {
-          w.ang += w.dir * 0.07 * dt;
-          var wp = cyl(15.0, w.ang, -w.k * Hl);
-          out.movers[wi2 + 1] = { x: wp[0], y: wp[1], z: wp[2], yaw: yawTo(-Math.sin(w.ang) * w.dir, Math.cos(w.ang) * w.dir), step: time * 6 + w.ph, bob: Math.abs(Math.sin(time * 6 + w.ph)) * 0.025, on: true, light: 0.62 * (1 - 0.3 * nightK) };
-        } else out.movers[wi2 + 1] = { on: false, x: 0, y: 0, z: 0, yaw: 0 };
-      }
+      var out = {};
 
       // événement rare en cours
       var ev = sched.tick(time, startEvent);
@@ -859,14 +804,7 @@
 
     return {
       update: update,
-      trigger: function (name, t) {
-        if (name === 'porter') { porter = null; nextPorter = 0; return; }
-        if (name === 'walkers') {
-          for (var q = 0; q < 3; q++) walkers[q] = { k: ctx.k + 1 + (q % 2), ang: (ctx.a == null ? PI / 4 : ctx.a) + 0.6 + q * 0.5, dir: q % 2 ? 1 : -1, end: t + 60, ph: q * 2 };
-          return;
-        }
-        sched.force(name, t, startEvent);
-      },
+      trigger: function (name, t) { sched.force(name, t, startEvent); },
       mesh: m, fog: [0.075, 0.066, 0.055], fogRange: [8, 38], fov: 58, flick: 0.25, texPeriod: 2 * Hl,
       cam: function (ph, mode) {
         if (mode === 'void') {
@@ -1109,14 +1047,10 @@
         m.beam(Lp(0, 0, 0.08), Lp(Math.cos(aa) * 0.3, Math.sin(aa) * 0.3, 0.05), 0.035, chrome, 0);
       }
     }
-    // fauteuils un peu de travers, deux opérateurs assis, papiers et tasses sur le bureau
+    // fauteuils un peu de travers, papiers et tasses sur le bureau
     for (q = 0; q < 6; q++) {
       var cAng = far + (q - 2.5) * 0.3, cRot = (rnd(60 + q) - 0.5) * 0.9;
       chair(cAng, cRot);
-      if (q === 1 || q === 4) {
-        var ar2 = cAng + cRot, cp = cyl(2.85, cAng, 0), rd = [Math.cos(ar2), 0, Math.sin(ar2)];
-        bakePerson(m, [cp[0] - rd[0] * 0.2, 0.06, cp[2] - rd[2] * 0.2], yawTo(rd[0], rd[2]), 'sit', personLook(function (n) { return rnd(70 + q * 10 + n); }));
-      }
     }
     for (q = 0; q < 9; q++) {
       var pa2 = D0 + 0.1 + rnd(90 + q) * 1.6, pr = 3.5 + rnd(100 + q) * 0.45, pt = rnd(110 + q);
@@ -1128,11 +1062,7 @@
       if (pt >= 0.55 && pt < 0.8) m.box(pc2[0] - 0.035, 0.77, pc2[2] - 0.035, pc2[0] + 0.035, 0.86, pc2[2] + 0.035, pt < 0.68 ? [0.7, 0.68, 0.62] : [0.35, 0.22, 0.15], LIT_PLAIN);
       if (pt >= 0.8) m.box(pc2[0] - 0.12, 0.77, pc2[2] - 0.17, pc2[0] + 0.12, 0.82, pc2[2] + 0.17, [0.2, 0.28, 0.42], LIT_PLAIN);
     }
-    // un opérateur debout devant une baie
-    var sb = clA(1);
-    bakePerson(m, cyl(R - 1.55, sb + 0.12, 0), yawTo(Math.cos(sb), Math.sin(sb)), 'stand', personLook(function (n) { return rnd(140 + n); }));
-    // l'opérateur qui fait sa ronde (animé), poussière dans la lueur des écrans
-    moverPerson(m, 0, personLook(function (n) { return rnd(150 + n); }), false);
+    // poussière dans la lueur des écrans
     for (q = 0; q < 60; q++) dustAt(m, cyl(4.6 + rnd(160 + q) * 2.4, far + (rnd(300 + q) - 0.5) * 2.2, 0.4 + rnd(450 + q) * 2.6), [0.26, 0.32, 0.42], q);
     var RA0 = far - 0.8, NR = 8, dR = 1.6 / NR;
     for (q = 0; q <= NR; q++) rail(cyl(2.15, RA0 + q * dR, 0), cyl(2.15, RA0 + q * dR, 1.0), 0.028);
@@ -1181,16 +1111,11 @@
       }
     }
 
-    // ---- la ronde de l'opérateur et les incidents ----
+    // ---- incidents : écrans sans signal, baisse de lumière ----
     function roomEvent(kind, t) { return { kind: kind, t0: t, end: t + (kind === 'snow' ? 0.7 : 1.8) }; }
     var sched = Scheduler(rnd, ['snow', 'lights', 'snow']);
     function update(time) {
-      // aller-retour le long des baies, avec des arrêts devant les écrans
-      var u = mod(time * 0.018 + rnd(170), 2), p = u < 1 ? u : 2 - u, pe = p * p * (3 - 2 * p);
-      var ang = far - 0.95 + 1.9 * pe, moving = Math.abs(p - 0.5) < 0.42, dir = u < 1 ? 1 : -1;
-      var pos = cyl(4.75, ang, 0);
-      var out = { movers: [{ x: pos[0], y: 0, z: pos[2], yaw: moving ? yawTo(-Math.sin(ang) * dir, Math.cos(ang) * dir) : yawTo(Math.cos(ang), Math.sin(ang)),
-                             step: moving ? time * 5.5 : 0, bob: moving ? Math.abs(Math.sin(time * 5.5)) * 0.02 : 0, on: true, light: 0.42 }] };
+      var out = {};
       var ev = sched.tick(time, roomEvent);
       if (ev) {
         var e = time - ev.t0;
@@ -1450,7 +1375,6 @@
       [-0.17, 0.17].forEach(function (lx) { obox(cx, cz, yaw, lx - 0.02, lx + 0.02, 0.36, 0.4, -0.45, -0.02, metal); });
     }
     var painted = [hexc('#5f6e58'), hexc('#5a6a78'), hexc('#7a6a4a')];
-    var seats = [];
     for (i = 0; i < 5; i++) {
       for (j = 0; j < 7; j++) {
         if (rnd(100 + i * 7 + j) < 0.07) continue;   // table absente
@@ -1471,20 +1395,8 @@
           var ccol = rnd(700 + i * 31 + j * 7 + q) < 0.15 ? painted[Math.floor(rnd(710 + i * 7 + j + q) * 3)] : tint(woodC, i * 31 + j * 7 + q, 0.14);
           if (hq > 0.96) { fallenChair(ccx + side * 0.3, ccz, yaw + 0.6, ccol); continue; }
           chair(ccx, ccz, yaw, ccol);
-          seats.push([ccx, ccz, yaw]);
         }
       }
-    }
-    // habitants : quelques-uns attablés, deux ou trois debout devant l'écran à regarder dehors
-    var nSit = 7 + Math.floor(rnd(800) * 5);
-    for (q = 0; q < nSit && seats.length; q++) {
-      var si = Math.floor(rnd(810 + q) * seats.length), st2 = seats.splice(si, 1)[0];
-      var sy = st2[2], sc2 = Math.cos(sy), ss2 = Math.sin(sy);
-      bakePerson(m, [st2[0] - 0.17 * ss2, 0.02, st2[1] + 0.17 * sc2], sy + PI, 'sit', personLook(function (n) { return rnd(820 + q * 10 + n); }));
-    }
-    var nWatch = 2 + Math.floor(rnd(900) * 2);
-    for (q = 0; q < nWatch; q++) {
-      bakePerson(m, [-4 + rnd(910 + q) * 8, 0, -12.7 + rnd(920 + q) * 0.6], PI + (rnd(930 + q) - 0.5) * 0.5, 'stand', personLook(function (n) { return rnd(940 + q * 10 + n); }));
     }
     // bacs hydroponiques et plaque du Pacte
     planters.forEach(function (pl, pi2) {
@@ -1501,44 +1413,17 @@
       m.quad([X0 + 0.275, 2.12 - q * 0.13, -6.5], [X0 + 0.275, 2.12 - q * 0.13, -6.5 + ln2], [X0 + 0.275, 2.16 - q * 0.13, -6.5 + ln2], [X0 + 0.275, 2.16 - q * 0.13, -6.5], [0.62, 0.58, 0.48], LIT_PLAIN);
     }
     m.layer = 0;
-    // deux passants animés, poussière dans la lumière de la rosace, vapeur (pour les essais)
-    moverPerson(m, 0, personLook(function (n) { return rnd(1000 + n); }), false);
-    moverPerson(m, 1, personLook(function (n) { return rnd(1010 + n); }), false);
+    // poussière dans la lumière de la rosace
     for (q = 0; q < 80; q++) {
       var da = rnd(1100 + q) * TAU, dr2 = Math.sqrt(rnd(1300 + q)) * 4.6;
       dustAt(m, [Math.cos(da) * dr2, 0.5 + rnd(1500 + q) * 2.6, CZ + Math.sin(da) * dr2], [0.4, 0.37, 0.31], q);
     }
 
-    // ---- passants : l'un traverse la salle dans une allée, l'autre va regarder l'écran et revient ----
-    function walkPath(pts, speed, t, pauseIdx, pauseT) {
-      var segs = [], total = 0, q2;
-      for (q2 = 0; q2 < pts.length - 1; q2++) { var lseg = Math.hypot(pts[q2 + 1][0] - pts[q2][0], pts[q2 + 1][1] - pts[q2][1]); segs.push(lseg); total += lseg; }
-      var cycle = total / speed + pauseT, tt = mod(t, cycle), d = 0;
-      for (q2 = 0; q2 < segs.length; q2++) {
-        var ts = segs[q2] / speed;
-        if (q2 === pauseIdx) {
-          if (tt < pauseT) return { x: pts[q2][0], z: pts[q2][1], dx: 0, dz: -1, moving: false };
-          tt -= pauseT;
-        }
-        if (tt <= ts) {
-          var f = tt / ts, a2 = pts[q2], b2 = pts[q2 + 1];
-          return { x: a2[0] + (b2[0] - a2[0]) * f, z: a2[1] + (b2[1] - a2[1]) * f, dx: b2[0] - a2[0], dz: b2[1] - a2[1], moving: true };
-        }
-        tt -= ts;
-      }
-      var lp = pts[pts.length - 1];
-      return { x: lp[0], z: lp[1], dx: 0, dz: 1, moving: false };
-    }
-    var aisle = -10.5 + 1.55 + Math.floor(rnd(1700) * 3) * 3.1;
-    var pathA = [[-11, aisle], [11, aisle], [11, aisle + 0.4], [-11, aisle + 0.4], [-11, aisle]];
-    var pathB = [[-1.5, 6], [-1.5, -11.9], [-1.5, 6]];
+    // ---- incidents : l'écran perd le signal, baisse de lumière ----
     function roomEvent(kind, t) { return { kind: kind, t0: t, end: t + (kind === 'snow' ? 0.6 : 1.8) }; }
     var sched = Scheduler(rnd, ['snow', 'lights']);
     function update(time) {
-      var out = { movers: [] };
-      [walkPath(pathA, 0.85, time + rnd(1710) * 60, -1, 0), walkPath(pathB, 0.75, time + rnd(1720) * 60, 1, 9)].forEach(function (w, i2) {
-        out.movers.push({ x: w.x, y: 0, z: w.z, yaw: yawTo(w.dx, w.dz), step: w.moving ? time * 5.8 + i2 : 0, bob: w.moving ? Math.abs(Math.sin(time * 5.8 + i2)) * 0.02 : 0, on: true, light: 0.5 });
-      });
+      var out = {};
       var ev = sched.tick(time, roomEvent);
       if (ev) {
         var e = time - ev.t0;
@@ -1589,8 +1474,6 @@
     'uniform vec3 uEvLevel;',      // coupure de courant : y bas, y haut, facteur
     'uniform vec2 uDoor;',         // porte qui s'ouvre : id, intensité
     'uniform vec4 uSteam;',        // vapeur : position, âge 0..1 (hors plage = rien)
-    'uniform vec4 uMovA[8];',      // habitants animés : x, y, z, cap
-    'uniform vec4 uMovB[8];',      // phase du pas, rebond, visible, luminosité
     'varying vec4 vCol;',
     'varying float vDepth;',
     'varying vec3 vPos;',
@@ -1629,20 +1512,6 @@
     '    if (rk < 0.5 && num < 100.0) hide = 1.0;',   // pas de zéro devant
     '    float mask = uSeg[int(d + 0.5)];',
     '    if (mod(floor(mask / p2(sg) + 0.001), 2.0) < 0.5) hide = 1.0;',
-    '  } else if (aFx > -9000.0) {',
-    '    float c = -aFx - 7000.0;',
-    '    float idf = floor(c / 10.0 + 0.001), part = mod(c, 10.0);',
-    '    vec4 A = uMovA[int(idf + 0.5)]; vec4 B = uMovB[int(idf + 0.5)];',
-    '    if (B.z < 0.5) hide = 1.0;',
-    '    if (part > 0.5 && part < 2.5) {',
-    '      float hip = 0.9;',
-    '      float sw = sin(B.x) * (part < 1.5 ? 0.42 : -0.42), dy = pos.y - hip;',
-    '      pos = vec3(pos.x, hip + dy * cos(sw), pos.z + dy * sin(sw));',
-    '    }',
-    '    pos.y += B.y;',
-    '    float c2 = cos(A.w), s2 = sin(A.w);',
-    '    pos = vec3(A.x + pos.x * c2 - pos.z * s2, A.y + pos.y, A.z + pos.x * s2 + pos.z * c2);',
-    '    k = B.w;',
     '  } else if (aFx > -9500.0) {',
     '    float n = -aFx - 9000.0;',
     '    float life = uSteam.w * 1.5 - h1(n) * 0.5;',
@@ -1795,9 +1664,8 @@
       for (var i = 0; i < 3; i++) gl.enableVertexAttribArray(LOCS[i]);
       var U = {};
       ['uProj', 'uView', 'uSnap', 'uTime', 'uFlick', 'uLamp', 'uFog', 'uFogRange', 'uPer', 'uGrain', 'uCold', 'uEmFog',
-       'uNight', 'uLevelBase', 'uSeg', 'uEvLevel', 'uDoor', 'uSteam', 'uMovA', 'uMovB', 'uSnow'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+       'uNight', 'uLevelBase', 'uSeg', 'uEvLevel', 'uDoor', 'uSteam', 'uSnow'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
       gl.uniform1fv(U.uSeg, new Float32Array(SEG_MASK));
-      var movA = new Float32Array(32), movB = new Float32Array(32);
       var nightOverride = null, night = nightNow(), nightAt = 0;
       gl.enable(gl.DEPTH_TEST);
       var curFov = sc.fov;
@@ -1830,14 +1698,6 @@
         var sm = st.steam || [0, 0, 0, -1];
         gl.uniform4f(U.uSteam, sm[0], sm[1], sm[2], sm[3]);
         gl.uniform1f(U.uSnow, st.snow || 0);
-        movA.fill(0); movB.fill(0);
-        (st.movers || []).forEach(function (mv, i) {
-          if (i > 7) return;
-          movA[i * 4] = mv.x; movA[i * 4 + 1] = mv.y; movA[i * 4 + 2] = mv.z; movA[i * 4 + 3] = mv.yaw;
-          movB[i * 4] = mv.step || 0; movB[i * 4 + 1] = mv.bob || 0; movB[i * 4 + 2] = mv.on ? 1 : 0; movB[i * 4 + 3] = mv.light == null ? 0.6 : mv.light;
-        });
-        gl.uniform4fv(U.uMovA, movA);
-        gl.uniform4fv(U.uMovB, movB);
         if (cam.fov && cam.fov !== curFov) {
           curFov = cam.fov;
           gl.uniformMatrix4fv(U.uProj, false, perspective(curFov * Math.PI / 180, W / Hh, 0.15, 60));
