@@ -150,9 +150,9 @@ ipcMain.handle('dialog:showOpenDialog', (event, options) => {
     return dialog.showOpenDialog(win, options)
 })
 
-// Disable hardware acceleration.
-// https://electronjs.org/docs/tutorial/offscreen-rendering
-app.disableHardwareAcceleration()
+// Hardware acceleration stays ON: the 3D background (WebGL) would otherwise
+// be rendered by SwiftShader on the CPU (3-4 cores busy on a 9700X).
+// Inherited from HeliosLauncher, which disabled it with no 3D content.
 
 
 const REDIRECT_URI_PREFIX = 'https://login.microsoftonline.com/common/oauth2/nativeclient?'
