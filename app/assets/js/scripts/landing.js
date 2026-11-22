@@ -390,7 +390,7 @@ async function dlAsync(login = true) {
         invalidAssets = [...validated.assets, ...validated.libraries, ...validated.client, ...validated.misc]
         setLaunchPercentage(100)
     } catch (err) {
-        loggerLaunchSuite.error('Error during file validation.')
+        loggerLaunchSuite.error('Error during file validation.', err)
         showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileVerificationTitle'), err.displayable || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
         return
     }
@@ -411,7 +411,7 @@ async function dlAsync(login = true) {
             })
             setDownloadPercentage(100)
         } catch(err) {
-            loggerLaunchSuite.error('Error during file download.')
+            loggerLaunchSuite.error('Error during file download.', err)
             showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileDownloadTitle'), err.displayable || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
             return
         }

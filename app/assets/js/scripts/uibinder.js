@@ -217,12 +217,20 @@ function completeStartupUI(data) {
         loggerUIBinder.warn('Failed to refresh landing UI during startup.', err)
     }
 
+    // Synchronous, before prepareSettings() below: on a first install there
+    // is no javaConfig entry for the server yet, and the Settings screen
+    // reads it (getMaxRAM etc.) right away. Cheap (one entry per server).
+    try {
+        ensureJavaSettings(data)
+    } catch (err) {
+        loggerUIBinder.warn('Failed to ensure java settings during startup.', err)
+    }
+
     setTimeout(() => {
         try {
             syncModConfigurations(data)
-            ensureJavaSettings(data)
         } catch (err) {
-            loggerUIBinder.warn('Failed to sync mod/java settings during startup.', err)
+            loggerUIBinder.warn('Failed to sync mod settings during startup.', err)
         }
     }, 0)
 
