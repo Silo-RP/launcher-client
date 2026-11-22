@@ -6,8 +6,8 @@ const pkg = require('../../../package.json')
 
 // URL of the silo-sync backend (github.com/Silo-RP/launcher-backend), serving
 // config.json / news.json / files / java / forge / backgrounds for this server.
-// No trailing slash. Placeholder until the production backend exists.
-exports.SYNC_URL = 'http://localhost:8080'
+// No trailing slash.
+exports.SYNC_URL = 'http://185.146.193.198:25570'
 
 // GitHub "owner/repo" the launcher's releases are published to: release
 // notes feed (Settings > About), macOS update download link. Must match the
