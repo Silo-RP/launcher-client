@@ -5,7 +5,9 @@
  *
  * The backend serves a single markdown document. Each `## ` heading starts
  * one bulletin (newest first); text before the first heading, or a document
- * without any heading, becomes a single untitled bulletin.
+ * without any heading, becomes a single untitled bulletin. A heading may start
+ * with a date followed by a separator: "## 18/11 · Titre",
+ * "## 18/11/2026 - Titre", "## 2026-11-18 | Titre", "## 18 novembre · Titre".
  */
 const marked = require('marked')
 
@@ -15,6 +17,19 @@ const newsEmpty   = document.getElementById('newsEmpty')
 
 let bulletins = []
 let bulletinSelected = 0
+
+const BULLETIN_DATE = /^(\d{1,2}[/.]\d{1,2}(?:[/.]\d{2,4})?|\d{4}-\d{2}-\d{2}|\d{1,2}(?:er)?\s+(?:janv|f[ée]vr|mars|avr|mai|juin|juil|ao[uû]t|sept|oct|nov|d[ée]c)[a-zéû]*\.?(?:\s+\d{4})?)\s*[·|:–-]\s*(.+)$/i
+
+/**
+ * Split an optional leading date off a bulletin heading.
+ *
+ * @param {string} heading The heading text.
+ * @returns {{date: string|null, title: string}} Date (as written) and title.
+ */
+function splitBulletinHeading(heading){
+    const m = BULLETIN_DATE.exec(heading.trim())
+    return m ? { date: m[1], title: m[2] } : { date: null, title: heading }
+}
 
 function escapeBulletinText(text){
     return text.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
@@ -52,7 +67,7 @@ function parseBulletins(markdown){
     }
     return parts.map((p, i) => ({
         num: parts.length - i,
-        title: p.title,
+        ...splitBulletinHeading(p.title),
         body: p.lines.join('\n').trim()
     }))
 }
@@ -68,11 +83,11 @@ function renderBulletins(){
         return
     }
     newsList.innerHTML = bulletins.map((b, i) => `<button class="post" type="button" data-post="${i}" aria-current="${i === bulletinSelected}">
-            <span class="meta"><i aria-hidden="true"></i>${Lang.queryJS('news.number', { num: b.num })}</span>
+            <span class="meta"><i aria-hidden="true"></i>${b.date ? `${escapeBulletinText(b.date)} \u00B7 ${Lang.queryJS('news.numberShort', { num: b.num })}` : Lang.queryJS('news.number', { num: b.num })}</span>
             <span class="ttl">${escapeBulletinText(b.title)}</span>
         </button>`).join('')
     const b = bulletins[bulletinSelected]
-    newsArticle.innerHTML = `<p class="when">${Lang.queryJS('news.number', { num: b.num })}</p>
+    newsArticle.innerHTML = `<p class="when">${b.date ? Lang.queryJS('news.numberWithDate', { num: b.num, date: escapeBulletinText(b.date) }) : Lang.queryJS('news.number', { num: b.num })}</p>
         <h2>${escapeBulletinText(b.title)}</h2>
         <div class="articleBody">${marked.parse(b.body)}</div>`
     newsArticle.scrollTop = 0
@@ -90,6 +105,7 @@ function setBulletins(markdown, unread){
     renderBulletins()
 
     const teaser = document.getElementById('newsTeaser')
+    document.querySelector('.navLink[data-nav="bulletin"]').toggleAttribute('data-unread', !!unread && bulletins.length > 0)
     if(bulletins.length > 0){
         document.getElementById('newsTeaserNum').textContent = Lang.queryJS('news.number', { num: bulletins[0].num })
         document.getElementById('newsTeaserTitle').textContent = bulletins[0].title

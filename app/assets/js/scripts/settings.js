@@ -1051,6 +1051,8 @@ function updateRangedSlider(element, value, notch){
 function populateMemoryStatus(){
     settingsMemoryTotal.innerHTML = formatRamGo((os.totalmem()-1073741824)/1073741824)
     settingsMemoryAvail.innerHTML = formatRamGo(os.freemem()/1073741824)
+    document.getElementById('settingsMemoryRecommended').textContent =
+        Lang.queryJS('settings.memoryRecommended', { amount: formatRamGo(ConfigManager.getRecommendedRAM()) })
 }
 
 function populateJvmOptsLink(server) {

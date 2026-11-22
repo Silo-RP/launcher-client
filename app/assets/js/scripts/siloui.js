@@ -218,6 +218,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     })
 
+    // Enter on the home screen = JOUER (unless a control has the focus,
+    // which then handles Enter itself).
+    document.addEventListener('keydown', e => {
+        if(e.key !== 'Enter' || e.repeat || isOverlayVisible()) return
+        const focus = document.activeElement
+        if(focus != null && focus !== document.body && focus.closest('button, a, input, select, textarea, summary, label, [tabindex]')) return
+        if(getCurrentView() === VIEWS.landing
+            && document.getElementById('landingContainer').getAttribute('data-mode') === 'accueil'
+            && !launch_button.disabled){
+            e.preventDefault()
+            launch_button.click()
+        }
+    })
+
     document.addEventListener('keydown', e => {
         if(e.key !== 'Escape' || isOverlayVisible()) return
         const menu = document.getElementById('accountMenu')

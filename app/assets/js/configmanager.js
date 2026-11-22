@@ -81,14 +81,32 @@ function normalizeDataDirectory(dir){
     return dir
 }
 
+/**
+ * Memory to allocate by default on this PC, in gigabytes: enough for a
+ * modded 1.20.1 pack while leaving the system room to breathe. Thresholds
+ * sit a bit under the nominal sizes (a "16 Go" PC reports ~15.8 Go).
+ *
+ * @returns {number} Gigabytes.
+ */
+function recommendedRAMGB() {
+    const gb = os.totalmem() / 1073741824
+    if(gb >= 22) return 8
+    if(gb >= 15) return 6
+    if(gb >= 11) return 5
+    if(gb >= 7.5) return 4
+    if(gb >= 5.5) return 3
+    return 2
+}
+
+exports.getRecommendedRAM = function(){
+    return recommendedRAMGB()
+}
+
 function resolveSelectedRAM(ram) {
     if(ram?.recommended != null) {
         return `${ram.recommended}M`
-    } else {
-        // Legacy behavior
-        const mem = os.totalmem()
-        return mem >= (8*1073741824) ? '4G' : (mem >= (6*1073741824) ? '3G' : '2G')
     }
+    return `${recommendedRAMGB()}G`
 }
 
 /**

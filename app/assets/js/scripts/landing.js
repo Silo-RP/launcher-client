@@ -288,6 +288,24 @@ function updateSelectedAccount(authUser){
         }
     }
     user_text.innerHTML = username
+
+    // Skin head (mc-heads.net); the generic icon stays if it can't load.
+    const avatar = document.getElementById('accountAvatar')
+    avatar.hidden = true
+    avatar.parentElement.classList.remove('hasHead')
+    if(authUser?.uuid){
+        avatar.onload = () => {
+            avatar.hidden = false
+            avatar.parentElement.classList.add('hasHead')
+        }
+        avatar.onerror = () => {
+            avatar.hidden = true
+            avatar.parentElement.classList.remove('hasHead')
+        }
+        avatar.src = `https://mc-heads.net/avatar/${encodeURIComponent(authUser.uuid)}/52`
+    } else {
+        avatar.removeAttribute('src')
+    }
 }
 updateSelectedAccount(ConfigManager.getSelectedAccount())
 
@@ -424,6 +442,7 @@ refreshNews()
  */
 function markNewsRead(){
     document.getElementById('newsTeaser').removeAttribute('unread')
+    document.querySelector('.navLink[data-nav="bulletin"]').removeAttribute('data-unread')
     if(newsHash != null){
         ConfigManager.setNewsCache({ date: newsHash, content: null, dismissed: true })
         ConfigManager.save()

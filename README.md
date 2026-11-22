@@ -23,7 +23,8 @@ Forked from [Ventrys Launcher][ventrys-launcher], itself built on top of [Helios
 - **Automatic Java, Forge, mod and config sync** from `silo-sync` on every launch - nothing to install or choose manually.
 - **Optional addons**: mods/shaders the server makes available but doesn't enforce, toggled per-player from Settings.
 - **Orphan file cleanup**: a file removed server-side is removed client-side on the next launch (scoped to explicitly-managed folders only - never touches saves/screenshots/logs).
-- **Bulletins** (news) served by `silo-sync`: each `## ` heading of the admin news page is one bulletin.
+- **Bulletins** (news) served by `silo-sync`: each `## ` heading of the admin news page is one bulletin, newest first. A heading may start with a date and a separator (`## 18/11 · Titre`, `## 18 novembre · Titre`, `## 2026-11-18 - Titre`); an unread dot shows on the Bulletin tab.
+- **Launch screen**: progress as silo levels, download rate and remaining size, journal on demand, cancellable server file sync, plain French error messages; Settings > Avancé > "Réparer l'installation" reinstalls Java and Forge on the next launch.
 - **Animated low-poly 3D background** (WebGL, PS1 style): one room per menu, unloaded while the game runs (a static "game running" screen is shown instead), can be turned off in Settings.
 - **Self-updating launcher** (`electron-updater`, GitHub releases of this repo).
 - RAM / JVM options, an outage banner when Minecraft services are down, and a built-in debug console (Settings > Avancé).

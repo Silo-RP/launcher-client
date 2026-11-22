@@ -27,13 +27,13 @@
     </div>
     <!-- Shown while Minecraft runs: static, the 3D background is unmounted meanwhile (siloui.js). -->
     <section id="gameRunning" aria-live="polite" aria-labelledby="gameRunningTitle">
-        <svg class="emblem" width="40" height="40" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-opacity="0.7" stroke-width="0.8"/><circle cx="10" cy="10" r="5.2" fill="none" stroke="currentColor" stroke-opacity="0.7" stroke-width="0.8"/><circle cx="10" cy="10" r="1.7" fill="#E3A341"/></svg>
+        <img class="emblem" src="./assets/images/emblem.png" width="56" height="56" alt="" aria-hidden="true">
         <h1 id="gameRunningTitle"><%- lang('gameRunning.title') %></h1>
         <p class="gameRunningText"><%- lang('gameRunning.text') %></p>
     </section>
     <%- include('overlay') %>
     <div id="loadingContainer">
-        <svg class="emblem emblemPulse" width="56" height="56" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-opacity="0.7" stroke-width="0.8"/><circle cx="10" cy="10" r="5.2" fill="none" stroke="currentColor" stroke-opacity="0.7" stroke-width="0.8"/><circle cx="10" cy="10" r="1.7" fill="#E3A341"/></svg>
+        <img class="emblem emblemPulse" src="./assets/images/emblem.png" width="72" height="72" alt="" aria-hidden="true">
     </div>
 </body>
 </html>

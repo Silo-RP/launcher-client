@@ -157,7 +157,9 @@ body[data-game-running] .banner { visibility: hidden; }
     font-weight: 500;
     color: var(--silo-text-2);
 }
+.navLink { position: relative; }
 .navLink:hover { color: var(--silo-text); }
+.navLink[data-unread]::after { content: ""; position: absolute; top: 16px; right: -9px; width: 5px; height: 5px; border-radius: 50%; background: var(--silo-accent); }
 .navLink[aria-current="page"] { color: var(--silo-text); border-bottom-color: var(--silo-accent); }
 
 .win { display: flex; align-items: center; height: 100%; }
@@ -183,6 +185,9 @@ body[data-game-running] .banner { visibility: hidden; }
     border: 1px solid rgba(236, 228, 214, 0.14);
     color: var(--silo-text-2);
 }
+.avatar img { width: 100%; height: 100%; image-rendering: pixelated; }
+.avatar.hasHead { border-color: rgba(236, 228, 214, 0.22); background: none; }
+.avatar.hasHead svg { display: none; }
 #user_text { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sep { width: 1px; height: 20px; margin: 0 6px; background: var(--silo-line); }
 .wc {
