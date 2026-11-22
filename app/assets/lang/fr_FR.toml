@@ -117,6 +117,10 @@ minimizeOnLaunchTitle = "Réduire le launcher pendant la partie"
 minimizeOnLaunchDesc = "Il revient tout seul quand le jeu se ferme."
 advancedTitle = "Avancé"
 
+[ejs.gameRunning]
+title = "Jeu en cours d’exécution"
+text = "Le launcher est en veille pour laisser toutes les ressources à Minecraft. Il revient tout seul quand vous quittez le jeu."
+
 [ejs.waiting]
 waitingText = "En attente de Microsoft…"
 waitingNote = "Terminez la connexion dans la fenêtre Microsoft."

@@ -9,13 +9,18 @@
  */
 
 let siloBg = null
+let siloBgLastShow = null
 let siloAnimEnabled = ConfigManager.getAnimatedBackground()
 let siloGameRunning = false
 let siloMinimizedForGame = false
 const siloBanners = {}
 
-/** Mount the background on first use (needs the parsed #bg element). */
+/**
+ * Mount the background on first use (needs the parsed #bg element). Never
+ * while the game runs: it is unmounted for the whole session.
+ */
 function siloEnsureBg(){
+    if(siloGameRunning) return null
     if(siloBg == null && typeof window.SiloBackground === 'function'){
         siloBg = window.SiloBackground(document.getElementById('bg'))
         siloBgRefresh()
@@ -69,7 +74,10 @@ function siloOnView(view){
         }
     }
     // Background first: nothing else here may keep the scene from showing.
-    siloEnsureBg()?.show(menu)
+    const bg = siloEnsureBg()
+    if(bg != null){
+        siloBgLastShow = bg.show(menu)
+    }
     closeAccountMenu()
     if(menu === 'accueil' && typeof refreshLandingMeta === 'function'){
         refreshLandingMeta()
@@ -101,28 +109,27 @@ async function siloNavigate(menu){
 }
 
 /**
- * Stairs descent speed while launching.
- *
- * @param {number|null} progress Overall launch progress (0-1), null for the resting speed.
- */
-function siloSetLaunchSpeed(progress){
-    if(siloBg == null || siloGameRunning) return
-    siloBg.setSpeed(progress == null ? 1 : 1 + progress * 5)
-}
-
-/**
- * The game process started (true) or exited (false): the background
- * freezes for the whole session, and the window is minimized meanwhile if
- * "Réduire le launcher pendant la partie" is on.
+ * The game process started (true) or exited (false). While it runs, the
+ * launcher goes to sleep: the 3D background is unmounted (render loops
+ * stopped, WebGL contexts released) and a static "game running" screen
+ * covers everything, so the window draws nothing more. The window is also
+ * minimized meanwhile if "Réduire le launcher pendant la partie" is on.
+ * When the game exits, the background is mounted again on the current view.
  *
  * @param {boolean} running Whether the Minecraft process is running.
  */
 function siloSetGameRunning(running){
     if(running === siloGameRunning) return
     siloGameRunning = running
+    document.body.toggleAttribute('data-game-running', running)
     if(running){
-        siloBg?.setSpeed(0.35)
-        setTimeout(siloBgRefresh, 1200)
+        closeAccountMenu()
+        if(siloBg != null){
+            const bg = siloBg
+            siloBg = null
+            // Let a scene change in progress finish before tearing down.
+            Promise.resolve(siloBgLastShow).catch(() => {}).then(() => bg.destroy())
+        }
         if(ConfigManager.getMinimizeOnLaunch()){
             setTimeout(() => {
                 if(siloGameRunning){
@@ -132,8 +139,7 @@ function siloSetGameRunning(running){
             }, 1500)
         }
     } else {
-        siloBg?.setSpeed(1)
-        siloBgRefresh()
+        siloOnView(getCurrentView())
         if(siloMinimizedForGame){
             siloMinimizedForGame = false
             ipcRenderer.send('window:restore')

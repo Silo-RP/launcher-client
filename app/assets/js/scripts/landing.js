@@ -44,7 +44,7 @@ const loggerLanding = LoggerUtil.getLogger('Landing')
 
 // The launch runs several independent stages, each reporting its own 0-100%.
 // They are mapped onto one monotonic progress, shown as "Niveau 087 / 144"
-// (the silo's 144 levels) and used to speed up the stairs descent.
+// (the silo's 144 levels). The background keeps its normal speed.
 const LAUNCH_LEVELS = 144
 const LAUNCH_PHASES = {
     validate: [0, 0.12],
@@ -80,7 +80,6 @@ function toggleLaunchArea(loading){
         landingContainer.setAttribute('data-mode', 'accueil')
         setLaunchLogOpen(false)
         setLaunchEnabled(ConfigManager.getSelectedServer() != null)
-        siloSetLaunchSpeed(null)
     }
     if(getCurrentView() === VIEWS.landing){
         siloOnView(VIEWS.landing)
@@ -148,7 +147,6 @@ function setLaunchPercentage(percent){
     const p = Math.min(100, Math.max(0, Number(percent) || 0)) / 100
     launchProgress = Math.max(launchProgress, from + (to - from) * p)
     renderLaunchProgress()
-    siloSetLaunchSpeed(launchProgress)
 }
 
 function renderLaunchProgress(){

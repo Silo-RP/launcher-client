@@ -24,7 +24,7 @@ Forked from [Ventrys Launcher][ventrys-launcher], itself built on top of [Helios
 - **Optional addons**: mods/shaders the server makes available but doesn't enforce, toggled per-player from Settings.
 - **Orphan file cleanup**: a file removed server-side is removed client-side on the next launch (scoped to explicitly-managed folders only - never touches saves/screenshots/logs).
 - **Bulletins** (news) served by `silo-sync`: each `## ` heading of the admin news page is one bulletin.
-- **Animated low-poly 3D background** (WebGL, PS1 style): one room per menu, paused while the game runs, can be turned off in Settings.
+- **Animated low-poly 3D background** (WebGL, PS1 style): one room per menu, unloaded while the game runs (a static "game running" screen is shown instead), can be turned off in Settings.
 - **Self-updating launcher** (`electron-updater`, GitHub releases of this repo).
 - RAM / JVM options, an outage banner when Minecraft services are down, and a built-in debug console (Settings > Avancé).
 

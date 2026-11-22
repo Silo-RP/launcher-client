@@ -103,6 +103,30 @@ body[data-screen="parametres"] #shade {
     background: var(--silo-bg);
 }
 
+/* ---- Game running: static screen, nothing animated behind it --------------------- */
+
+#gameRunning {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 0 120px;
+    background: var(--silo-bg);
+    text-align: center;
+}
+body[data-game-running] #gameRunning { display: flex; }
+#gameRunning h1 { font: 600 34px/1.1 var(--silo-font-display); letter-spacing: 0.18em; text-transform: uppercase; }
+.gameRunningText { max-width: 460px; font-size: 15px; line-height: 1.55; color: var(--silo-text-2); }
+body[data-game-running] .nav,
+body[data-game-running] .accountWrap,
+body[data-game-running] .updateChip,
+body[data-game-running] .sep,
+body[data-game-running] .banner { visibility: hidden; }
+
 /* ---- Top bar (frameless window: drag region, minimize + close) ----------------- */
 
 .topbar {
