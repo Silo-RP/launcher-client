@@ -27,6 +27,14 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+// Thrown when the player cancels the sync (see the `cancel` token below).
+class SyncCancelledError extends Error {
+    constructor() {
+        super('Sync cancelled by the player.')
+        this.name = 'SyncCancelledError'
+    }
+}
+
 // Broader than helios-core's own retryableError (which only covers
 // ECONNRESET/no-response and misses TimeoutError): a flaky connection
 // (4G/ADSL) doesn't always reset cleanly, it often just stalls until
@@ -75,12 +83,18 @@ async function fetchConfig(baseUrl, uuid, { maxAgeMs = 0 } = {}) {
 
 const MAX_DOWNLOAD_RETRIES = 10
 
-async function downloadTo(url, destPath, onProgress) {
+// `cancel` (optional): { cancelled, abort } token. Setting `cancelled` stops
+// before the next attempt; calling `abort()` stops the transfer in progress.
+// The partial file is kept, the next download resumes from it.
+async function downloadTo(url, destPath, onProgress, cancel) {
     await fs.ensureDir(path.dirname(destPath))
     const tmp = `${destPath}.download`
 
     let retryCount = 0
     for (;;) {
+        if (cancel?.cancelled) {
+            throw new SyncCancelledError()
+        }
         // Resume from wherever the previous attempt left off instead of
         // re-downloading the whole file - on a flaky connection, always
         // restarting from 0 can mean a large file never finishes within
@@ -101,6 +115,14 @@ async function downloadTo(url, destPath, onProgress) {
                 }
                 const stream = got.stream(url, options)
                 const out = fs.createWriteStream(tmp, resumeFrom > 0 ? { flags: 'a' } : undefined)
+                if (cancel) {
+                    cancel.abort = () => {
+                        const err = new SyncCancelledError()
+                        stream.destroy()
+                        out.destroy()
+                        reject(err)
+                    }
+                }
                 if (resumeFrom > 0) {
                     stream.on('response', res => {
                         // Server didn't honor the range (ignored it, or our
@@ -135,6 +157,9 @@ async function downloadTo(url, destPath, onProgress) {
             }
             break
         } catch (err) {
+            if (err instanceof SyncCancelledError) {
+                throw err
+            }
             retryCount++
             if (retryCount > MAX_DOWNLOAD_RETRIES || !isRetryableError(err)) {
                 throw err
@@ -144,6 +169,9 @@ async function downloadTo(url, destPath, onProgress) {
         }
     }
 
+    if (cancel) {
+        cancel.abort = null
+    }
     await fs.move(tmp, destPath, { overwrite: true })
 }
 
@@ -154,7 +182,7 @@ async function downloadTo(url, destPath, onProgress) {
 function singleFileProgress(fileName, onProgress) {
     if (!onProgress) return undefined
     return (transferred, total) => {
-        onProgress({ file: fileName, percent: total > 0 ? Math.round((transferred / total) * 100) : 0 })
+        onProgress({ file: fileName, percent: total > 0 ? Math.round((transferred / total) * 100) : 0, done: transferred, total })
     }
 }
 
@@ -376,7 +404,7 @@ const ADDONS_PREFIX = 'addons/'
  * file that isn't in `expected` - the generalized version of the old
  * pruneOrphans patch, minus the whitelist limitation.
  */
-async function syncFiles(filesCfg, instanceDir, enabledAddons, onProgress) {
+async function syncFiles(filesCfg, instanceDir, enabledAddons, onProgress, cancel) {
     const entries = filesCfg.entries
     const enabled = new Set(enabledAddons || [])
     const expected = new Set()
@@ -388,6 +416,9 @@ async function syncFiles(filesCfg, instanceDir, enabledAddons, onProgress) {
     // independently instead of contributing to one overall percentage.
     const toDownload = []
     for (const entry of entries) {
+        if (cancel?.cancelled) {
+            throw new SyncCancelledError()
+        }
         let localPath
         if (entry.mode === 'optional' || entry.mode === 'admin') {
             const realPath = entry.path.startsWith(ADDONS_PREFIX)
@@ -431,15 +462,43 @@ async function syncFiles(filesCfg, instanceDir, enabledAddons, onProgress) {
     for (const { entry, localPath } of toDownload) {
         const fileName = entry.path.split('/').pop()
         await downloadTo(entry.url, localPath, onProgress ? (transferred) => {
-            const percent = totalBytes > 0 ? Math.round(((bytesDone + transferred) / totalBytes) * 100) : 0
-            onProgress({ file: fileName, percent })
-        } : undefined)
+            const done = bytesDone + transferred
+            const percent = totalBytes > 0 ? Math.round((done / totalBytes) * 100) : 0
+            onProgress({ file: fileName, percent, done, total: totalBytes })
+        } : undefined, cancel)
         bytesDone += entry.size || 0
     }
 
     for (const dir of filesCfg.forcedDirectories || []) {
         await pruneDirectory(path.join(instanceDir, ...dir.split('/')), expected)
     }
+}
+
+/**
+ * "Réparer l'installation": forget that Java and Forge are installed, so the
+ * next launch downloads/extracts Java and runs the Forge installer again.
+ * Server files need nothing: they are hash-checked on every launch anyway.
+ *
+ * @returns {Promise<number>} How many markers were removed.
+ */
+async function resetInstallMarkers(commonDir) {
+    let removed = 0
+    for (const name of await fs.readdir(commonDir).catch(() => [])) {
+        if (name.startsWith('.forge-installed-')) {
+            await fs.remove(path.join(commonDir, name))
+            removed++
+        }
+    }
+    const javaRoot = path.join(commonDir, 'java')
+    for (const version of await fs.readdir(javaRoot).catch(() => [])) {
+        const marker = path.join(javaRoot, version, '.launcher-java-version')
+        if (await fs.pathExists(marker)) {
+            await fs.remove(marker)
+            removed++
+        }
+    }
+    logger.info(`Install markers reset (${removed}): Java and Forge will be reinstalled on next launch.`)
+    return removed
 }
 
 async function pruneDirectory(dir, expected) {
@@ -535,6 +594,8 @@ function buildDistribution(serverMeta, modManifest, commonDir, instanceDir) {
 }
 
 module.exports = {
+    SyncCancelledError,
+    resetInstallMarkers,
     fetchConfig,
     ensureJava,
     ensureForge,

@@ -58,6 +58,10 @@ let launchPhase = 'validate'
 let launchProgress = 0
 let launchFile = ''
 let launchLogLines = []
+// Byte counts of the current download: rate (bytes/s, smoothed) and remaining.
+let launchBytes = null
+// Cancel token of the server file sync, while it can be cancelled.
+let launchCancel = null
 
 /**
  * Switch the home screen between its resting state and the launch state.
@@ -71,6 +75,8 @@ function toggleLaunchArea(loading){
         launchPhase = 'validate'
         launchProgress = 0
         launchFile = ''
+        launchBytes = null
+        launchCancel = null
         launchLogLines = []
         renderLaunchLog()
         setLaunchState('preparing')
@@ -87,17 +93,29 @@ function toggleLaunchArea(loading){
 }
 
 /**
- * Right-hand state button while launching: LANCEMENT (preparing) or
- * EN JEU (the game process is running). Never clickable.
+ * Right-hand state button while launching: LANCEMENT (preparing), ANNULER
+ * (server file sync, the only cancellable stage) or EN JEU (the game runs).
+ * Only clickable as ANNULER.
  *
- * @param {'preparing'|'ingame'} state The state to show.
+ * @param {'preparing'|'cancel'|'ingame'} state The state to show.
  */
 function setLaunchState(state){
     launch_state.setAttribute('data-state', state)
-    launch_state.innerHTML = state === 'ingame'
-        ? Lang.queryJS('landing.launchState.ingame')
-        : Lang.queryJS('landing.launchState.preparing')
+    launch_state.disabled = state !== 'cancel'
+    launch_state.innerHTML = Lang.queryJS(`landing.launchState.${state}`)
 }
+
+launch_state.addEventListener('click', () => {
+    if(launch_state.getAttribute('data-state') !== 'cancel' || launchCancel == null){
+        return
+    }
+    launchCancel.cancelled = true
+    if(typeof launchCancel.abort === 'function'){
+        launchCancel.abort()
+    }
+    setLaunchState('preparing')
+    setLaunchDetails(Lang.queryJS('landing.dlAsync.cancelling'))
+})
 
 /**
  * Set the details text of the loading area, and log it in the journal.
@@ -134,7 +152,45 @@ function setLaunchFile(file){
  */
 function setLaunchPhase(phase){
     launchPhase = phase
+    launchBytes = null
     setLaunchPercentage(0)
+}
+
+/**
+ * Bytes downloaded so far in the current download, to show the rate and
+ * what remains. The rate is smoothed over samples at least 400 ms apart.
+ *
+ * @param {number} done Bytes received.
+ * @param {number} total Bytes expected.
+ */
+function setDownloadBytes(done, total){
+    const now = Date.now()
+    if(launchBytes == null || launchBytes.total !== total || done < launchBytes.done){
+        launchBytes = { done, total, at: now, rate: 0 }
+    } else if(now - launchBytes.at >= 400){
+        const instant = (done - launchBytes.done) / ((now - launchBytes.at) / 1000)
+        launchBytes.rate = launchBytes.rate > 0 ? launchBytes.rate * 0.7 + instant * 0.3 : instant
+        launchBytes.done = done
+        launchBytes.at = now
+    }
+    renderLaunchProgress()
+}
+
+/**
+ * Human-readable size: 850 Ko, 12,4 Mo, 1,2 Go.
+ *
+ * @param {number} bytes Size in bytes.
+ * @returns {string} The formatted size.
+ */
+function formatBytes(bytes){
+    const units = [['Go', 1073741824], ['Mo', 1048576], ['Ko', 1024]]
+    for(const [unit, size] of units){
+        if(bytes >= size){
+            const v = bytes / size
+            return `${v.toLocaleString('fr-FR', { maximumFractionDigits: v < 100 ? 1 : 0 })} ${unit}`
+        }
+    }
+    return `${Math.round(bytes)} o`
 }
 
 /**
@@ -154,8 +210,17 @@ function renderLaunchProgress(){
     launch_level.textContent = Lang.queryJS('landing.level', { level: String(level).padStart(3, '0'), total: LAUNCH_LEVELS })
     launch_fill.style.width = (launchProgress * 100).toFixed(2) + '%'
     launch_progress.setAttribute('aria-valuenow', level)
-    const percent = Math.round(launchProgress * 100) + ' %'
-    launch_progress_label.textContent = launchFile ? `${percent} · ${launchFile}` : percent
+    const parts = [Math.round(launchProgress * 100) + '\u00A0%']
+    if(launchBytes != null && launchBytes.total > 0 && launchBytes.done < launchBytes.total){
+        if(launchBytes.rate > 0){
+            parts.push(Lang.queryJS('landing.rate', { rate: formatBytes(launchBytes.rate) }))
+        }
+        parts.push(Lang.queryJS('landing.remaining', { size: formatBytes(launchBytes.total - launchBytes.done) }))
+    }
+    if(launchFile){
+        parts.push(launchFile)
+    }
+    launch_progress_label.textContent = parts.join(' \u00B7 ')
 }
 
 function renderLaunchLog(){
@@ -374,6 +439,8 @@ document.getElementById('newsTeaser').addEventListener('click', () => siloNaviga
  * @param {string} desc The overlay description.
  */
 function showLaunchFailure(title, desc){
+    launchLogLines.forEach(l => { if(l.status === 'run') l.status = 'err' })
+    renderLaunchLog()
     setOverlayContent(
         title,
         desc,
@@ -384,6 +451,70 @@ function showLaunchFailure(title, desc){
     if(proc == null){
         toggleLaunchArea(false)
     }
+}
+
+function escapeLaunchText(text){
+    return String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+}
+
+const NETWORK_ERROR_CODES = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT', 'ENETUNREACH', 'EHOSTUNREACH', 'EPIPE']
+
+/**
+ * Turn a launch error into a message for the player: what happened and what
+ * to do, plus the technical detail at the bottom.
+ *
+ * @param {*} err The error.
+ * @param {'backend'|'verify'|'download'|'prepare'|'start'} stage Where it happened.
+ * @returns {{title: string, desc: string}} The message.
+ */
+function describeLaunchError(err, stage){
+    const code = err?.code || ''
+    const name = err?.name || ''
+    const message = String(err?.message || err || '')
+    const status = err?.response?.statusCode
+    const url = String(err?.options?.url?.href || err?.options?.url || '')
+    const fromBackend = stage === 'backend' || url.startsWith(SYNC_URL)
+
+    let key
+    if(status){
+        key = fromBackend ? 'backendHttp' : 'remoteHttp'
+    } else if(NETWORK_ERROR_CODES.includes(code) || name === 'RequestError' || name === 'TimeoutError' || name === 'ReadError'){
+        key = fromBackend ? 'backendUnreachable' : 'network'
+    } else if(code === 'ENOSPC'){
+        key = 'diskFull'
+    } else if(code === 'EACCES' || code === 'EPERM' || code === 'EBUSY'){
+        key = 'fileLocked'
+    } else if(/checksum mismatch/i.test(message)){
+        key = 'corrupted'
+    } else if(/No Java build published/.test(message)){
+        key = 'noJava'
+    } else if(/Java extraction/.test(message)){
+        key = 'javaBroken'
+    } else if(/Forge installer/.test(message)){
+        key = 'forgeFailed'
+    } else {
+        key = 'unknown'
+    }
+
+    const title = key === 'unknown'
+        ? Lang.queryJS(`landing.errors.stage.${stage}`)
+        : Lang.queryJS(`landing.errors.${key}.title`)
+    let desc = key === 'unknown' && err?.displayable
+        ? escapeLaunchText(err.displayable)
+        : Lang.queryJS(`landing.errors.${key}.desc`, { status })
+    const detail = [code || name, status ? `HTTP ${status}` : '', message].filter(Boolean).join(' \u00B7 ').slice(0, 220)
+    if(detail){
+        desc += `<span class="errDetail">${Lang.queryJS('landing.errors.detail', { detail: escapeLaunchText(detail) })}</span>`
+    }
+    return { title, desc }
+}
+
+/**
+ * showLaunchFailure() with a message built from the error.
+ */
+function showLaunchError(err, stage){
+    const { title, desc } = describeLaunchError(err, stage)
+    showLaunchFailure(title, desc)
 }
 
 // Keep reference to Minecraft Process
@@ -420,7 +551,7 @@ async function dlAsync(login = true) {
         onDistroRefresh(distro)
     } catch(err) {
         loggerLaunchSuite.error('Unable to refresh distribution index.', err)
-        showLaunchFailure(Lang.queryJS('landing.dlAsync.fatalError'), Lang.queryJS('landing.dlAsync.unableToLoadDistributionIndex'))
+        showLaunchError(err, 'backend')
         return
     }
 
@@ -461,7 +592,7 @@ async function dlAsync(login = true) {
         setLaunchPercentage(100)
     } catch (err) {
         loggerLaunchSuite.error('Error during file validation.', err)
-        showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileVerificationTitle'), err.displayable || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
+        showLaunchError(err, 'verify')
         return
     }
 
@@ -473,6 +604,7 @@ async function dlAsync(login = true) {
             const expectedTotalSize = getExpectedDownloadSize(invalidAssets)
             let currentPercent = 0
             await downloadQueue(invalidAssets, received => {
+                setDownloadBytes(received, expectedTotalSize)
                 const nextPercent = expectedTotalSize > 0 ? Math.trunc((received / expectedTotalSize) * 100) : 100
                 if(currentPercent !== nextPercent) {
                     currentPercent = nextPercent
@@ -482,7 +614,7 @@ async function dlAsync(login = true) {
             setDownloadPercentage(100)
         } catch(err) {
             loggerLaunchSuite.error('Error during file download.', err)
-            showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileDownloadTitle'), err.displayable || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
+            showLaunchError(err, 'download')
             return
         }
     } else {
@@ -514,8 +646,11 @@ async function dlAsync(login = true) {
         const instancesRoot = ConfigManager.getInstanceDirectory()
         const instanceDir = ConfigManager.getServerInstanceDirectory(serv.rawServer.id)
 
-        const onDlProgress = ({ file, percent }) => {
-            setLaunchFile(file)
+        const onDlProgress = ({ file, percent, done, total }) => {
+            launchFile = file || ''
+            if(total > 0){
+                setDownloadBytes(done, total)
+            }
             setDownloadPercentage(percent)
         }
 
@@ -537,7 +672,11 @@ async function dlAsync(login = true) {
         const enabledAddons = ConfigManager.getAddonConfiguration(serv.rawServer.id)?.enabled || []
         setLaunchDetails(Lang.queryJS('landing.dlAsync.syncingServerFiles'))
         setLaunchPhase('files')
-        await syncClient.syncFiles(syncConfig, instanceDir, enabledAddons, onDlProgress)
+        launchCancel = { cancelled: false, abort: null }
+        setLaunchState('cancel')
+        await syncClient.syncFiles(syncConfig, instanceDir, enabledAddons, onDlProgress, launchCancel)
+        launchCancel = null
+        setLaunchState('preparing')
 
         modLoaderData = await fs.readJson(forgeVersionJsonPath)
         realServ = syncClient.buildDistribution({
@@ -552,8 +691,15 @@ async function dlAsync(login = true) {
             autoconnect: serv.rawServer.autoconnect
         }, modLoaderData, commonDir, instancesRoot)
     } catch (err) {
+        launchCancel = null
+        remote.getCurrentWindow().setProgressBar(-1)
+        if(err instanceof syncClient.SyncCancelledError){
+            loggerLaunchSuite.info('Launch cancelled by the player.')
+            toggleLaunchArea(false)
+            return
+        }
         loggerLaunchSuite.error('Error while preparing launch metadata.', err)
-        showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringLaunchTitle'), err.message || Lang.queryJS('landing.dlAsync.checkConsoleForDetails'))
+        showLaunchError(err, 'prepare')
         return
     }
 
@@ -672,8 +818,8 @@ async function dlAsync(login = true) {
                 if(spawnGracePeriod && code !== 0 && code != null){
                     loggerLaunchSuite.error(`Minecraft exited early with code ${code}${signal ? ` (${signal})` : ''}.`)
                     showLaunchFailure(
-                        Lang.queryJS('landing.dlAsync.errorDuringLaunchTitle'),
-                        Lang.queryJS('landing.dlAsync.checkConsoleForDetails')
+                        Lang.queryJS('landing.errors.earlyExit.title'),
+                        Lang.queryJS('landing.errors.earlyExit.desc', { code })
                     )
                 }
                 proc = null
@@ -692,7 +838,7 @@ async function dlAsync(login = true) {
             loggerLaunchSuite.error('Error during launch', err)
             proc = null
             siloSetGameRunning(false)
-            showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringLaunchTitle'), Lang.queryJS('landing.dlAsync.checkConsoleForDetails'))
+            showLaunchError(err, 'start')
 
         }
     }

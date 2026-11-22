@@ -403,6 +403,7 @@ body[data-screen="chargement"] .sep { visibility: hidden; }
 .fill { position: absolute; top: 3px; left: 0; z-index: 1; width: 0; height: 2px; background: var(--silo-accent); transition: width 0.2s linear; }
 
 #launch_state { cursor: default; color: var(--silo-text-2); }
+#launch_state[data-state="cancel"] { cursor: pointer; color: var(--silo-text); }
 #launch_state[data-state="ingame"] {
     border-color: var(--silo-accent);
     background: rgba(227, 163, 65, 0.12);
@@ -430,6 +431,7 @@ body[data-screen="chargement"] .sep { visibility: hidden; }
 .log div { display: flex; gap: 10px; white-space: nowrap; }
 .log b { flex-shrink: 0; min-width: 2ch; font-weight: 400; color: var(--silo-text-2); }
 .log b[data-status="ok"] { color: var(--silo-ok); }
+.log b[data-status="err"] { color: #E0806E; }
 .log span:last-child { color: var(--silo-text); overflow: hidden; text-overflow: ellipsis; }
 
 /* ---- Bulletin ---------------------------------------------------------------------- */
@@ -658,6 +660,7 @@ label.field { cursor: pointer; }
 .dialog h2 { font: 600 24px/1.15 var(--silo-font-display); letter-spacing: 0.06em; text-transform: uppercase; }
 #overlayDesc { overflow: auto; font-size: 14px; line-height: 1.55; color: #D2CABC; }
 #overlayDesc a { color: var(--silo-text); }
+.errDetail { display: block; margin-top: 14px; font: 12px/1.45 var(--silo-font-mono); color: var(--silo-text-3); overflow-wrap: anywhere; }
 .dialogActions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 4px; }
 .primary {
     height: 44px;

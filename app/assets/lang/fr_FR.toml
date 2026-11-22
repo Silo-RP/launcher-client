@@ -59,6 +59,9 @@ animatedBackgroundTitle = "Fond animé"
 minimizeOnLaunchTitle = "Réduire le launcher pendant la partie"
 minimizeOnLaunchDesc = "Il revient tout seul quand le jeu se ferme."
 advancedTitle = "Avancé"
+repairTitle = "Réparer l’installation"
+repairDesc = "Réinstalle Java et Forge au prochain lancement."
+repairButton = "Réparer"
 
 [ejs.gameRunning]
 title = "Jeu en cours d’exécution"
@@ -98,6 +101,8 @@ showLog = "Voir le journal"
 hideLog = "Masquer le journal"
 level = "Niveau {level} / {total}"
 mojangOutage = "Services Minecraft perturbés ({services}) : la connexion et les téléchargements peuvent échouer."
+rate = "{rate}/s"
+remaining = "{size} restants"
 
 [js.landing.dlAsync]
 loadingServerInfo = "Chargement des informations du serveur"
@@ -117,6 +122,7 @@ downloadingMinecraft = "Téléchargement de Minecraft"
 preparingJava = "Préparation de Java"
 installingForge = "Installation de Forge"
 syncingServerFiles = "Synchronisation des fichiers du serveur"
+cancelling = "Annulation…"
 
 [js.overlay]
 dismiss = "Fermer"
@@ -161,8 +167,8 @@ errorMessage = "Impossible d'authentifier votre compte Microsoft. Veuillez rées
 okButton = "OK"
 
 [js.uibinder.startup]
-fatalErrorTitle = "Erreur fatale : impossible de charger l'index de distribution"
-fatalErrorMessage = "Impossible de se connecter à nos serveurs pour télécharger l'index de distribution. Aucune copie locale n'était disponible.<br><br>Cet index est essentiel : il fournit les informations du serveur. Le launcher ne peut pas démarrer sans lui. Vérifiez votre connexion internet et relancez l'application."
+fatalErrorTitle = "Serveur du launcher injoignable"
+fatalErrorMessage = "Le launcher n’a pas pu récupérer les informations du serveur et n’en a pas de copie locale. Vérifiez votre connexion internet puis relancez le launcher. Si elle fonctionne, le serveur est sans doute en maintenance."
 closeButton = "Fermer"
 
 [js.uibinder.validateAccount]
@@ -211,11 +217,13 @@ emptyText = "Rien de nouveau pour le moment."
 
 preparing = "LANCEMENT"
 ingame = "EN JEU"
+cancel = "ANNULER"
 
 [js.landing.logStatus]
 
 run = "…"
 ok = "OK"
+err = "ERR"
 
 [js.landing.meta]
 
@@ -235,4 +243,74 @@ noAddons = "Aucun addon disponible pour ce serveur."
 
 errorTitle = "Une erreur s’est produite"
 errorMessage = "La déconnexion Microsoft a échoué. Veuillez réessayer."
+okButton = "OK"
+
+[js.landing.errors]
+detail = "Détail technique : {detail}"
+
+[js.landing.errors.stage]
+backend = "Serveur du launcher injoignable"
+verify = "Vérification des fichiers impossible"
+download = "Téléchargement interrompu"
+prepare = "Préparation du jeu impossible"
+start = "Démarrage du jeu impossible"
+
+[js.landing.errors.backendUnreachable]
+title = "Serveur du launcher injoignable"
+desc = "Impossible de joindre le serveur qui fournit les fichiers du jeu. Vérifiez votre connexion internet. Si elle fonctionne, le serveur est sans doute en maintenance : réessayez dans quelques minutes."
+
+[js.landing.errors.backendHttp]
+title = "Erreur du serveur du launcher"
+desc = "Le serveur des fichiers du jeu a répondu par une erreur (code {status}). Réessayez dans quelques minutes et, si cela continue, prévenez l’équipe du serveur."
+
+[js.landing.errors.network]
+title = "Connexion internet perdue"
+desc = "Un téléchargement a échoué faute de connexion. Vérifiez votre connexion internet puis relancez : ce qui a déjà été téléchargé est conservé."
+
+[js.landing.errors.remoteHttp]
+title = "Téléchargement refusé"
+desc = "Un serveur de Minecraft a refusé un téléchargement (code {status}). Réessayez dans quelques minutes."
+
+[js.landing.errors.diskFull]
+title = "Disque plein"
+desc = "Il ne reste pas assez de place sur le disque pour installer le jeu. Libérez de l’espace puis relancez."
+
+[js.landing.errors.fileLocked]
+title = "Fichier inaccessible"
+desc = "Un fichier du jeu est verrouillé ou protégé. Fermez Minecraft s’il tourne encore, vérifiez que votre antivirus ne bloque pas le dossier du jeu, puis relancez."
+
+[js.landing.errors.corrupted]
+title = "Fichier abîmé"
+desc = "Un fichier est arrivé abîmé pendant le téléchargement. Relancez simplement : il sera téléchargé à nouveau."
+
+[js.landing.errors.noJava]
+title = "Système non pris en charge"
+desc = "Java n’est pas encore disponible pour votre système sur ce serveur. Prévenez l’équipe du serveur."
+
+[js.landing.errors.javaBroken]
+title = "Installation de Java incomplète"
+desc = "Java n’a pas pu être installé correctement. Utilisez « Réparer l’installation » dans Paramètres, Avancé, puis relancez."
+
+[js.landing.errors.forgeFailed]
+title = "Installation de Forge échouée"
+desc = "L’installation de Forge n’a pas abouti. Utilisez « Réparer l’installation » dans Paramètres, Avancé, puis relancez. Si cela continue, votre antivirus bloque peut-être Java."
+
+[js.landing.errors.unknown]
+desc = "Une erreur inattendue s’est produite. Le journal du lancement et la console (Ctrl+Maj+I) contiennent les détails."
+
+[js.landing.errors.earlyExit]
+title = "Minecraft s’est arrêté au démarrage"
+desc = "Le jeu s’est fermé avec le code {code}. Si vous avez baissé la mémoire allouée, remontez-la dans Paramètres. Sinon, essayez « Réparer l’installation » dans Paramètres, Avancé."
+
+[js.settings.repair]
+confirmTitle = "Réparer l’installation ?"
+confirmText = "Java et Forge seront réinstallés au prochain lancement, et tous les fichiers du jeu revérifiés. Vos mondes, captures et réglages ne sont pas touchés."
+confirmButton = "Réparer"
+cancelButton = "Annuler"
+doneTitle = "C’est prêt"
+doneText = "Tout sera revérifié et réinstallé au prochain lancement."
+failedTitle = "Réparation impossible"
+failedText = "Le dossier du jeu n’a pas pu être modifié. Fermez Minecraft s’il tourne encore, puis réessayez."
+busyTitle = "Lancement en cours"
+busyText = "Attendez la fin du lancement ou fermez le jeu avant de réparer l’installation."
 okButton = "OK"

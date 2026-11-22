@@ -77,6 +77,36 @@ document.getElementById('settingsOpenDataDir').onclick = () => {
     shell.openPath(ConfigManager.getDataDirectory())
 }
 
+// "Réparer l'installation": Java and Forge are reinstalled on the next
+// launch (server files are hash-checked on every launch anyway).
+document.getElementById('settingsRepairButton').onclick = () => {
+    if(document.getElementById('landingContainer').getAttribute('data-mode') === 'lancement'){
+        setOverlayContent(Lang.queryJS('settings.repair.busyTitle'), Lang.queryJS('settings.repair.busyText'), Lang.queryJS('settings.repair.okButton'))
+        setOverlayHandler(null)
+        toggleOverlay(true)
+        return
+    }
+    setOverlayContent(
+        Lang.queryJS('settings.repair.confirmTitle'),
+        Lang.queryJS('settings.repair.confirmText'),
+        Lang.queryJS('settings.repair.confirmButton'),
+        Lang.queryJS('settings.repair.cancelButton')
+    )
+    setOverlayHandler(async () => {
+        try {
+            await syncClient.resetInstallMarkers(ConfigManager.getCommonDirectory())
+            setOverlayContent(Lang.queryJS('settings.repair.doneTitle'), Lang.queryJS('settings.repair.doneText'), Lang.queryJS('settings.repair.okButton'))
+        } catch (err) {
+            console.error('Repair failed.', err)
+            setOverlayContent(Lang.queryJS('settings.repair.failedTitle'), Lang.queryJS('settings.repair.failedText'), Lang.queryJS('settings.repair.okButton'))
+        }
+        setOverlayHandler(null)
+        toggleOverlay(true)
+    })
+    setDismissHandler(null)
+    toggleOverlay(true, true)
+}
+
 // "Fond animé" applies right away; it is persisted with the other settings.
 document.getElementById('settingsAnimatedBackground').addEventListener('change', e => {
     siloSetAnimatedBackground(e.target.checked)
