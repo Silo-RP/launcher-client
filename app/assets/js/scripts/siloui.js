@@ -13,6 +13,10 @@ let siloBgLastShow = null
 let siloAnimEnabled = ConfigManager.getAnimatedBackground()
 let siloGameRunning = false
 let siloMinimizedForGame = false
+// Ambiance sonore synthétisée (silo-ambience.js), désactivée par défaut
+const siloAmbience = typeof window.SiloAmbience === 'function' ? window.SiloAmbience() : null
+siloAmbience?.setEnabled(ConfigManager.getAmbientSound())
+document.addEventListener('visibilitychange', () => siloAmbience?.setSuspended(document.hidden || siloGameRunning))
 const siloBanners = {}
 
 /**
@@ -86,6 +90,8 @@ function siloOnView(view){
             link.removeAttribute('aria-current')
         }
     }
+    // The ambient sound follows the room shown.
+    siloAmbience?.setScene(window.SiloBackground?.MENUS[menu]?.scene ?? null)
     // Background first: nothing else here may keep the scene from showing.
     const bg = siloEnsureBg()
     if(bg != null){
@@ -135,6 +141,7 @@ function siloSetGameRunning(running){
     if(running === siloGameRunning) return
     siloGameRunning = running
     document.body.toggleAttribute('data-game-running', running)
+    siloAmbience?.setSuspended(running || document.hidden)
     if(running){
         closeAccountMenu()
         if(siloBg != null){
@@ -158,6 +165,15 @@ function siloSetGameRunning(running){
             ipcRenderer.send('window:restore')
         }
     }
+}
+
+/**
+ * "Ambiance sonore" setting, applied immediately.
+ *
+ * @param {boolean} enabled Whether the ambient sound plays.
+ */
+function siloSetAmbientSound(enabled){
+    siloAmbience?.setEnabled(enabled)
 }
 
 /**

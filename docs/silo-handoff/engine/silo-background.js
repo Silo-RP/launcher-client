@@ -32,6 +32,9 @@
   function SiloBackground(container, options) {
     options = options || {};
     var look = { grain: options.grain == null ? 1 : options.grain, cold: options.cold == null ? 0.35 : options.cold };
+    // un tirage par lancement du launcher, partagé par toutes les salles
+    var seed = options.seed == null ? Math.random() * 1000 : options.seed;
+    var nightOverride = null;
     var fadeMs = options.fadeMs || 260;
     var layers = {};
     var current = null, manualPause = false, queue = Promise.resolve();
@@ -49,7 +52,8 @@
       cv.setAttribute('aria-hidden', 'true');
       cv.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:none;image-rendering:pixelated;';
       container.insertBefore(cv, veil);
-      var h = window.SiloPS1.mount(cv, { scene: scene, grain: look.grain, cold: look.cold });
+      var h = window.SiloPS1.mount(cv, { scene: scene, grain: look.grain, cold: look.cold, seed: seed });
+      if (nightOverride != null) h.setNight(nightOverride);
       h.pause();
       layers[scene] = { canvas: cv, handle: h, hiddenAt: Date.now() };
       return layers[scene];
@@ -128,6 +132,9 @@
         if (o.cold != null) look.cold = o.cold;
         Object.keys(layers).forEach(function (k) { layers[k].handle.setLook(look); });
       },
+      // essais : forcer la nuit (0..1, null = heure réelle), déclencher un événement dans la salle affichée
+      setNight: function (v) { nightOverride = v; Object.keys(layers).forEach(function (k) { layers[k].handle.setNight(v); }); },
+      trigger: function (name) { if (current) current.layer.handle.trigger(name); },
       pause: function () { manualPause = true; onVisibility(); },
       resume: function () { manualPause = false; onVisibility(); },
       destroy: function () {

@@ -107,6 +107,11 @@ document.getElementById('settingsRepairButton').onclick = () => {
     toggleOverlay(true, true)
 }
 
+// "Ambiance sonore" too.
+document.getElementById('settingsAmbientSound').addEventListener('change', e => {
+    siloSetAmbientSound(e.target.checked)
+})
+
 // "Fond animé" applies right away; it is persisted with the other settings.
 document.getElementById('settingsAnimatedBackground').addEventListener('change', e => {
     siloSetAnimatedBackground(e.target.checked)

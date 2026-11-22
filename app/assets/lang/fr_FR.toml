@@ -25,6 +25,8 @@ accountSelectConfirm = "Sélectionner"
 accountSelectCancel = "Annuler"
 
 [ejs.settings]
+ambientSoundTitle = "Ambiance sonore"
+ambientSoundDesc = "Ventilation, pas lointains, portes : des sons discrets du silo."
 navHeaderText = "Paramètres"
 navDone = "Fermer les paramètres"
 addMicrosoftAccount = "Ajouter un compte Microsoft"

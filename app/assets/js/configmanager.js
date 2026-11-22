@@ -127,7 +127,8 @@ const DEFAULT_CONFIG = {
         launcher: {
             allowPrerelease: false,
             dataDirectory: dataPath,
-            animatedBackground: true
+            animatedBackground: true,
+            ambientSound: false
         }
     },
     newsCache: {
@@ -826,6 +827,25 @@ exports.getAnimatedBackground = function(def = false){
  */
 exports.setAnimatedBackground = function(animatedBackground){
     config.settings.launcher.animatedBackground = animatedBackground
+}
+
+/**
+ * Check if the ambient sound ("Ambiance sonore") is on.
+ *
+ * @param {boolean} def Optional. If true, the default value will be returned.
+ * @returns {boolean} Whether or not the ambient sound plays.
+ */
+exports.getAmbientSound = function(def = false){
+    return !def ? config.settings.launcher.ambientSound : DEFAULT_CONFIG.settings.launcher.ambientSound
+}
+
+/**
+ * Turn the ambient sound on or off.
+ *
+ * @param {boolean} ambientSound Whether or not the ambient sound plays.
+ */
+exports.setAmbientSound = function(ambientSound){
+    config.settings.launcher.ambientSound = ambientSound
 }
 
 /**
