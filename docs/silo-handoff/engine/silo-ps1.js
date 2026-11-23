@@ -44,6 +44,20 @@
   var FX_DIGIT = -4000;     // chiffre peint : -4000 - (niveau * 100 + rang * 10 + segment), éclairé
   var FX_STEAM = -9000;     // particule de vapeur : -9000 - n
   var FX_DUST = -9500;      // poussière en suspension : -9500 - n
+  var FX_SCREEN = -12000;   // écran de la salle de contrôle : -12000 - (écran * 20 + rôle), palette choisie par le shader
+  // palettes des écrans (haut, bas, sombre, clair) : images (caméra sépia, diagnostic cyan, caméra grise,
+  // radar vert, diagnostic violet, alerte rouge) puis terminaux (bleu, ambre, vert)
+  var SCREEN_PAL = [
+    [0.8, 0.66, 0.48], [0.34, 0.26, 0.18], [0.2, 0.15, 0.1], [0.95, 0.85, 0.65],
+    [0.5, 0.88, 0.96], [0.12, 0.38, 0.5], [0.06, 0.2, 0.28], [0.8, 0.98, 1.0],
+    [0.72, 0.74, 0.72], [0.25, 0.27, 0.27], [0.12, 0.13, 0.13], [0.92, 0.93, 0.9],
+    [0.25, 0.7, 0.38], [0.04, 0.2, 0.08], [0.02, 0.1, 0.04], [0.6, 1.0, 0.65],
+    [0.62, 0.45, 0.9], [0.18, 0.1, 0.35], [0.1, 0.05, 0.2], [0.9, 0.8, 1.0],
+    [0.9, 0.3, 0.25], [0.3, 0.05, 0.05], [0.15, 0.03, 0.03], [1.0, 0.75, 0.6],
+    [0.22, 0.38, 0.9], [0.12, 0.2, 0.6], [0.1, 0.16, 0.45], [0.7, 0.8, 1.0],
+    [0.3, 0.18, 0.04], [0.16, 0.09, 0.02], [0.1, 0.06, 0.02], [1.0, 0.72, 0.28],
+    [0.06, 0.22, 0.1], [0.03, 0.12, 0.05], [0.02, 0.08, 0.03], [0.45, 1.0, 0.55]
+  ];
   function isLit(fx) { return !fx || fx === LIT_PLAIN || (fx <= FX_DIGIT && fx > FX_DIGIT - 3000); }
   // bucketH : range les lumières par tranche de hauteur pour n'évaluer que les plus proches
   // layer : 0 = structure ; 1 et 2 = décors posés sur une surface (cadres, vitres, écrans…),
@@ -875,11 +889,6 @@
     var deskC = hexc('#2c3035'), panelC = hexc('#1d2024'), chairC = hexc('#18191b'), chrome = hexc('#9aa3ab');
     var cableC = hexc('#0e0f10'), lineC = hexc('#b8782c'), platC = hexc('#4b4f55');
     var led = [0.35, 0.8, 1.0];
-    var PAL = {
-      warm: { t: [0.8, 0.66, 0.48], b: [0.34, 0.26, 0.18], k: [0.2, 0.15, 0.1], hi: [0.95, 0.85, 0.65] },
-      cyan: { t: [0.5, 0.88, 0.96], b: [0.12, 0.38, 0.5], k: [0.06, 0.2, 0.28], hi: [0.8, 0.98, 1.0] },
-      term: { t: [0.22, 0.38, 0.9], b: [0.12, 0.2, 0.6], k: [0.1, 0.16, 0.45], hi: [0.7, 0.8, 1.0] }
-    };
 
     // ---- outils : repère local d'un panneau (u le long du mur, v vers le haut, n vers la salle) ----
     function frameAt(r, a, du, yc, tilt, yaw) {
@@ -922,9 +931,12 @@
       }
     }
     function rail(p0, p1, r) { m.tube(p0, p1, r, 6, steel, 0, 1); }
-    // écran : boîtier, dalle lumineuse, liseré LED, contenu sans recouvrement (aucun scintillement)
-    function screen(F, w, h, kind, seed) {
-      var Pl = PAL[kind], k2, st = rnd(500 + seed * 3.1);
+    // écran : boîtier, dalle lumineuse, liseré LED et deux contenus possibles (lignes de terminal ou
+    // blocs d'image) ; le shader choisit la palette et le contenu, et change de canal de temps en temps
+    var screenCount = Math.floor(rnd(4242) * 300);   // la suite des canaux change à chaque lancement
+    function screen(F, w, h, seed) {
+      var k2, st = rnd(500 + seed * 3.1), sid = screenCount++;
+      var code = function (role) { return FX_SCREEN - (sid * 20 + role); };
       fbox(F, -w / 2 - 0.05, w / 2 + 0.05, -h / 2 - 0.06, h / 2 + 0.05, -0.08, 0, bezel, 0);
       if (st < 0.08) {
         // écran mort
@@ -932,31 +944,27 @@
         return;
       }
       if (st < 0.13) {
-        // écran sans signal : neige permanente (code 999, voir le fragment shader)
+        // écran sans signal : neige permanente (code 999)
         m.layer = 1; fquad(F, -w / 2, w / 2, -h / 2, h / 2, 0.004, [0.6, 0.62, 0.64], 999); m.layer = 0;
         return;
       }
       m.layer = 1;
-      fquad(F, -w / 2, w / 2, -h / 2, h / 2, 0.004, [Pl.b, Pl.b, Pl.t, Pl.t], seed);
+      fquad(F, -w / 2, w / 2, -h / 2, h / 2, 0.004, [[0, 0, 0], [0, 0, 0], [1, 1, 1], [1, 1, 1]], code(0));   // dégradé bas → haut
       fquad(F, -w / 2 + 0.04, w / 2 - 0.04, -h / 2 - 0.05, -h / 2 - 0.03, 0.004, led, -1);
       m.layer = 2;
-      if (kind === 'term') {
-        for (k2 = 0; k2 < 6; k2++) {
-          var lw = (0.35 + 0.55 * hash(seed + k2)) * (w - 0.12), ly = h / 2 - 0.07 - k2 * (h - 0.12) / 6;
-          fquad(F, -w / 2 + 0.06, -w / 2 + 0.06 + lw, ly - 0.02, ly, 0.008, Pl.hi, seed);
-        }
-      } else {
-        for (k2 = 0; k2 < 3; k2++) {
-          var cx0 = -w / 2 + k2 * w / 3, bw = (w / 3) * (0.45 + 0.4 * hash(seed * 7 + k2));
-          var bx0 = cx0 + 0.02 + (w / 3 - 0.04 - bw) * hash(seed * 11 + k2);
-          var by0 = -h / 2 + 0.07 + 0.2 * h * hash(seed * 13 + k2), bh = (h / 2 - 0.03 - by0) * (0.45 + 0.5 * hash(seed * 17 + k2));
-          fquad(F, bx0, bx0 + bw, by0, by0 + bh, 0.008, k2 === 1 ? Pl.hi : Pl.k, seed);
-        }
-        fquad(F, -w / 2 + 0.02, w / 2 - 0.02, -h / 2 + 0.012, -h / 2 + 0.05, 0.008, kind === 'warm' ? [0.35, 0.75, 0.95] : Pl.hi, seed);
+      for (k2 = 0; k2 < 6; k2++) {   // lignes de terminal (rôles 5 à 10)
+        var lw = (0.35 + 0.55 * hash(seed + k2)) * (w - 0.12), ly = h / 2 - 0.07 - k2 * (h - 0.12) / 6;
+        fquad(F, -w / 2 + 0.06, -w / 2 + 0.06 + lw, ly - 0.02, ly, 0.008, [1, 1, 1], code(5 + k2));
       }
+      for (k2 = 0; k2 < 3; k2++) {   // blocs d'image (rôles 1 à 3, le 2 est clair) et barre (rôle 4)
+        var cx0 = -w / 2 + k2 * w / 3, bw = (w / 3) * (0.45 + 0.4 * hash(seed * 7 + k2));
+        var bx0 = cx0 + 0.02 + (w / 3 - 0.04 - bw) * hash(seed * 11 + k2);
+        var by0 = -h / 2 + 0.07 + 0.2 * h * hash(seed * 13 + k2), bh = (h / 2 - 0.03 - by0) * (0.45 + 0.5 * hash(seed * 17 + k2));
+        fquad(F, bx0, bx0 + bw, by0, by0 + bh, 0.008, [1, 1, 1], code(1 + k2));
+      }
+      fquad(F, -w / 2 + 0.02, w / 2 - 0.02, -h / 2 + 0.012, -h / 2 + 0.05, 0.008, [1, 1, 1], code(4));
       m.layer = 0;
     }
-    function kindOf(seed) { var h = hash(seed); return h < 0.55 ? 'warm' : (h < 0.9 ? 'cyan' : 'term'); }
 
     // ---- murs, sol, plafond, luminaire annulaire ----
     var RRf = [0, 1.5, 3, 4.5, 6, R], RRc = [2.6, 4.2, 5.8, R];
@@ -999,12 +1007,12 @@
       }
       m.layer = 0;
       // écrans : un grand, deux latéraux tournés vers lui, trois en haut penchés, deux petits au pupitre
-      screen(frameAt(R - off, a, 0, 2.05, 0.12, 0), 1.3, 0.8, kindOf(sd + 0.1), sd + 1);
-      screen(frameAt(R - off, a, -1.15, 2.05, 0.1, 0.3), 0.75, 0.5, kindOf(sd + 0.2), sd + 2);
-      screen(frameAt(R - off, a, 1.15, 2.05, 0.1, -0.3), 0.75, 0.5, kindOf(sd + 0.3), sd + 3);
-      for (q = 0; q < 3; q++) screen(frameAt(R - off, a, (q - 1) * 0.8, 2.86, 0.38, (1 - q) * 0.12), 0.66, 0.42, kindOf(sd + 0.4 + q), sd + 4 + q);
-      screen(frameAt(R - off - 0.05, a, -0.38, 1.36, -0.15, 0.08), 0.44, 0.28, kindOf(sd + 0.8), sd + 8);
-      screen(frameAt(R - off - 0.05, a, 0.38, 1.36, -0.15, -0.08), 0.44, 0.28, kindOf(sd + 0.9), sd + 9);
+      screen(frameAt(R - off, a, 0, 2.05, 0.12, 0), 1.3, 0.8, sd + 1);
+      screen(frameAt(R - off, a, -1.15, 2.05, 0.1, 0.3), 0.75, 0.5, sd + 2);
+      screen(frameAt(R - off, a, 1.15, 2.05, 0.1, -0.3), 0.75, 0.5, sd + 3);
+      for (q = 0; q < 3; q++) screen(frameAt(R - off, a, (q - 1) * 0.8, 2.86, 0.38, (1 - q) * 0.12), 0.66, 0.42, sd + 4 + q);
+      screen(frameAt(R - off - 0.05, a, -0.38, 1.36, -0.15, 0.08), 0.44, 0.28, sd + 8);
+      screen(frameAt(R - off - 0.05, a, 0.38, 1.36, -0.15, -0.08), 0.44, 0.28, sd + 9);
       // câbles : en boucles sous le plafond, du haut de la baie au plafond, et au sol jusqu'au bureau
       for (q = -1; q <= 1; q += 2) sag(cyl(R - 0.45, a + q * 0.12, H - 0.04), cyl(2.75, a + q * 0.3, H - 0.04), 0.7 + 0.4 * hash(sd + q), 0.04, cableC);
       sag(cyl(R - 0.1, a - 0.27, 3.95), cyl(R - 0.1, a + 0.2, 3.7), 0.45 + 0.3 * hash(sd + 5), 0.035, cableC);
@@ -1030,7 +1038,7 @@
     [-0.62, -0.22, 0.22, 0.62].forEach(function (da, k2) {
       var am = far + da;
       m.beam(cyl(3.97, am, 0.77), cyl(3.97, am, 0.86), 0.05, dark, 0);
-      screen(frameAt(3.92, am, 0, 1.05, -0.06, 0), 0.55, 0.32, kindOf(200 + k2), 200 + k2);
+      screen(frameAt(3.92, am, 0, 1.05, -0.06, 0), 0.55, 0.32, 200 + k2);
       block(3.5, 3.64, am - 0.07, am + 0.07, 0.77, 0.795, dark, 0);
     });
     function chair(ac, rot) {
@@ -1474,16 +1482,21 @@
     'uniform vec3 uEvLevel;',      // coupure de courant : y bas, y haut, facteur
     'uniform vec2 uDoor;',         // porte qui s'ouvre : id, intensité
     'uniform vec4 uSteam;',        // vapeur : position, âge 0..1 (hors plage = rien)
+    'uniform float uSnow;',        // incident : tous les écrans grésillent
+    'uniform vec3 uPal[36];',      // palettes des écrans de contrôle (4 couleurs × 9)
     'varying vec4 vCol;',
     'varying float vDepth;',
     'varying vec3 vPos;',
     'varying float vTex;',
     'varying float vFx;',
+    'varying float vSn;',
     'float h1(float n) { return fract(sin(n * 12.9898 + 4.1) * 43758.5453); }',
     'float p10(float d) { return d < 0.5 ? 100.0 : (d < 1.5 ? 10.0 : 1.0); }',
     'float p2(float sgm) { return sgm < 0.5 ? 1.0 : sgm < 1.5 ? 2.0 : sgm < 2.5 ? 4.0 : sgm < 3.5 ? 8.0 : sgm < 4.5 ? 16.0 : sgm < 5.5 ? 32.0 : 64.0; }',
     'void main() {',
     '  vec3 pos = aPos;',
+    '  vec3 base = aCol;',
+    '  vSn = 0.0;',
     '  float day = mix(1.0, 0.62, uNight);',
     '  float k = uLamp * day;',
     '  float hide = 0.0, psize = 1.0;',
@@ -1491,6 +1504,7 @@
     '    float n = fract(sin(floor(uTime * 12.0) * 12.9898 + aFx * 78.233) * 43758.5453);',
     '    k = 1.0 - uFlick * n * n;',
     '    if (aFx == 77.0) k *= mix(1.0, 0.32, uNight);',   // l'écran sur l'extérieur suit le jour
+    '    vSn = aFx > 998.5 && aFx < 999.5 ? 0.85 : (aFx < 1000.0 ? uSnow : 0.0);',
     '  } else if (aFx == 0.0 || aFx == -0.5) {',
     '  } else if (aFx > -1000.0) {',
     '    k = mix(1.0, 0.8, uNight);',
@@ -1518,11 +1532,36 @@
     '    if (uSteam.w < 0.0 || uSteam.w > 1.0 || life < 0.0 || life > 1.0) hide = 1.0;',
     '    pos = uSteam.xyz + aPos * (0.4 + 2.4 * life) + vec3(0.0, life * (1.6 + 1.6 * h1(n + 2.0)), 0.0);',
     '    k = 1.0; psize = life < 0.45 ? 2.0 : 1.0;',
-    '  } else {',
+    '  } else if (aFx > -10000.0) {',
     '    float n = -aFx - 9500.0;',
     '    float t = uTime * 0.06 + h1(n) * 6.28;',
     '    pos += vec3(sin(t * 1.3) * 0.4, sin(t * 0.7 + n) * 0.3, cos(t * 0.9 + n * 0.5) * 0.4);',
     '    k = day;',
+    '  } else {',
+    // écran de contrôle : canal tiré au sort, changé toutes les 9 à 19 s (rythme propre à chaque écran)
+    '    float c = -aFx - 12000.0;',
+    '    float sid = floor(c / 20.0 + 0.001), role = c - sid * 20.0;',
+    '    float per = 9.0 + 10.0 * h1(sid * 1.7), tt = uTime + sid * 5.3;',
+    '    float ep = floor(tt / per), u = fract(tt / per);',
+    '    float r = h1(sid * 3.3 + ep * 7.1);',
+    '    float pal = r < 0.2 ? 0.0 : r < 0.34 ? 1.0 : r < 0.45 ? 2.0 : r < 0.55 ? 3.0 : r < 0.63 ? 4.0 : r < 0.67 ? 5.0 : r < 0.78 ? 6.0 : r < 0.89 ? 7.0 : 8.0;',
+    '    float txt = step(5.5, pal);',
+    '    int pi = int(pal * 4.0 + 0.5);',
+    '    if (role < 0.5) base = mix(uPal[pi + 1], uPal[pi], aCol.r);',
+    '    else if (role < 3.5) {',
+    '      base = abs(role - 2.0) < 0.5 ? uPal[pi + 3] : uPal[pi + 2];',
+    '      if (txt > 0.5 || h1(sid * 3.1 + role * 7.7 + ep * 1.3) < 0.2) hide = 1.0;',
+    '    } else if (role < 4.5) {',
+    '      base = uPal[pi + 3];',
+    '      if (txt > 0.5) hide = 1.0;',
+    '    } else {',
+    '      base = uPal[pi + 3];',   // le texte s'écrit ligne par ligne
+    '      if (txt < 0.5 || u < 0.05 + (role - 5.0) * 0.08 || h1(sid + role * 3.7 + ep) < 0.12) hide = 1.0;',
+    '    }',
+    '    float fn = fract(sin(floor(uTime * 12.0) * 12.9898 + (sid + 1.0) * 78.233) * 43758.5453);',
+    '    k = 1.0 - uFlick * fn * fn;',
+    '    if (abs(pal - 5.0) < 0.5) k *= 0.55 + 0.45 * step(0.5, fract(uTime * 1.4));',   // alerte : clignote
+    '    vSn = max(uSnow * 0.85, step(u * per, 0.22) * 0.9);',   // grésillement au changement de canal
     '  }',
     '  if (uEvLevel.z < 0.999 && pos.y > uEvLevel.x && pos.y < uEvLevel.y && aFx < 0.5 && aFx > -7000.0) k *= uEvLevel.z;',
     '  vFx = aFx;',
@@ -1532,7 +1571,7 @@
     '  vDepth = -v.z;',
     '  vec4 p = uProj * v;',
     '  if (p.w > 0.0) { vec2 s = p.xy / p.w; s = floor(s * uSnap + 0.5) / uSnap; p.xy = s * p.w; }',
-    '  vCol = vec4(aCol * k * p.w, p.w);',
+    '  vCol = vec4(base * k * p.w, p.w);',
     '  gl_PointSize = psize;',
     '  gl_Position = hide > 0.5 ? vec4(2.0, 2.0, 2.0, 1.0) : p;',
     '}'
@@ -1552,8 +1591,8 @@
     'varying vec3 vPos;',
     'varying float vTex;',
     'varying float vFx;',
+    'varying float vSn;',
     'uniform float uTime;',
-    'uniform float uSnow;',
     'uniform vec3 uFog;',
     'uniform vec2 uFogRange;',
     'uniform float uPer;',
@@ -1600,9 +1639,9 @@
     '    float cl = sin(vPos.x * 0.55 + uTime * 0.045) * sin(vPos.y * 2.1 - uTime * 0.02 + vPos.x * 0.3);',
     '    c *= 0.93 + 0.09 * cl;',
     '  }',
-    '  if (vFx > 0.0 && vFx < 1000.0 && (uSnow > 0.0 || (vFx > 998.5 && vFx < 999.5))) {',   // écrans qui grésillent
+    '  if (vSn > 0.0) {',   // écrans qui grésillent : incident, changement de canal, pas de signal
     '    float sn = h3(vec3(floor(gl_FragCoord.xy), floor(uTime * 24.0)));',
-    '    c = mix(c, vec3(0.25 + 0.6 * sn), vFx > 998.5 ? 0.85 : uSnow);',
+    '    c = mix(c, vec3(0.25 + 0.6 * sn), vSn);',
     '  }',
     '  float f = clamp((vDepth - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);',
     '  c = mix(c, uFog, f * (vTex > 0.5 ? 1.0 : uEmFog));',
@@ -1664,8 +1703,9 @@
       for (var i = 0; i < 3; i++) gl.enableVertexAttribArray(LOCS[i]);
       var U = {};
       ['uProj', 'uView', 'uSnap', 'uTime', 'uFlick', 'uLamp', 'uFog', 'uFogRange', 'uPer', 'uGrain', 'uCold', 'uEmFog',
-       'uNight', 'uLevelBase', 'uSeg', 'uEvLevel', 'uDoor', 'uSteam', 'uSnow'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+       'uNight', 'uLevelBase', 'uSeg', 'uEvLevel', 'uDoor', 'uSteam', 'uSnow', 'uPal'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
       gl.uniform1fv(U.uSeg, new Float32Array(SEG_MASK));
+      gl.uniform3fv(U.uPal, new Float32Array([].concat.apply([], SCREEN_PAL)));
       var nightOverride = null, night = nightNow(), nightAt = 0;
       gl.enable(gl.DEPTH_TEST);
       var curFov = sc.fov;
