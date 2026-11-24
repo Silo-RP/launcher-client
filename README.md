@@ -24,7 +24,7 @@ Forked from [Ventrys Launcher][ventrys-launcher], itself built on top of [Helios
 - **Optional addons**: mods/shaders the server makes available but doesn't enforce, toggled per-player from Settings.
 - **Orphan file cleanup**: a file removed server-side is removed client-side on the next launch (scoped to explicitly-managed folders only - never touches saves/screenshots/logs).
 - **Bulletins** (news) served by `silo-sync`: each `## ` heading of the admin news page is one bulletin, newest first. A heading may start with a date and a separator (`## 18/11 · Titre`, `## 18 novembre · Titre`, `## 2026-11-18 - Titre`); an unread dot shows on the Bulletin tab.
-- **Launch screen**: progress as silo levels, download rate and remaining size, journal on demand, cancellable server file sync, plain French error messages; Settings > Avancé > "Réparer l'installation" reinstalls Java and Forge on the next launch.
+- **Launch screen**: progress percentage, download rate and remaining size, journal on demand, cancellable server file sync, plain French error messages; Settings > Avancé > "Réparer l'installation" reinstalls Java and Forge on the next launch.
 - **Animated low-poly 3D background** (WebGL, PS1 style): one room per menu, unloaded while the game runs (a static "game running" screen is shown instead), can be turned off in Settings. The rooms are alive: a new random draw at each launcher start (which levels are under works, run-down or abandoned, which lamps are dead, clutter, people), day/night following the real clock (corridors dim, windows light up in the evening), painted level numbers, distant static silhouettes on the stairwell galleries, control-room screens that switch channel and colour every few seconds (camera feeds, diagnostics, radar, alerts, amber/green/blue terminals), rare events (power cut on a level, a door opening, steam, screens losing signal), a camera that pauses and looks around.
 - **Ambient sound** (optional, off by default): synthesized live with Web Audio, no audio files (ventilation, distant steps, doors, cafeteria murmur, console beeps).
 - **Self-updating launcher** (`electron-updater`, GitHub releases of this repo).
@@ -47,7 +47,7 @@ Everything project-specific lives in these files - nothing else in the codebase 
 | What | Where |
 | --- | --- |
 | Backend URL, GitHub repo, game data folder name | `app/assets/js/launcherConfig.js` |
-| Window title, home/login texts (fallback title, tagline, Pacte line), YouTube/Discord links (empty = hidden) | `app/assets/lang/_custom.toml` |
+| Window title, home/login texts (fallback title, tagline), YouTube/Discord links (empty = hidden) | `app/assets/lang/_custom.toml` |
 | Colors, fonts, window metrics | `app/assets/css/silo/tokens.css` (styles: `app/assets/css/silo/app.css`) |
 | 3D background (rooms, scene per menu) | `app/assets/js/silo/` (copied as-is from `docs/silo-handoff/engine/`) |
 | Window / taskbar icon | `app/assets/images/logo.png` / `logo.ico` (source: `docs/branding/logo_fondateur.png`) |

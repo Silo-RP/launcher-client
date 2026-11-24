@@ -374,8 +374,7 @@ body[data-screen="chargement"] .sep { visibility: hidden; }
 .teaserTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .tagline { margin-top: 12px; font-size: 15px; color: var(--silo-text-2); }
-.tagline:empty, .pacte:empty { display: none; }
-.pacte { font-size: 13px; }
+.tagline:empty { display: none; }
 
 .status { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--silo-text-2); }
 .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--silo-text-3); }
@@ -386,7 +385,7 @@ body[data-screen="chargement"] .sep { visibility: hidden; }
 .launchBlock { display: flex; flex-direction: column; gap: 10px; }
 #launch_details_text { font-size: 15px; }
 .rowSmall { align-items: center; font-size: 13px; }
-.level {
+.percent {
     flex-shrink: 0;
     font: 500 16px var(--silo-font-display);
     letter-spacing: 0.12em;

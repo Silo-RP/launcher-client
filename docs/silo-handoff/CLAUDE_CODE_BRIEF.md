@@ -71,7 +71,7 @@ En cas de doute, **enlève plutôt qu'ajouter**. C'est la scène 3D qui porte l'
 
 - **Connexion** : emblème, « SILO », une phrase, bouton « CONNEXION MICROSOFT » (ambre), mention de la fenêtre Microsoft. Pas de navigation ni de compte.
 - **Accueil** : en bas à gauche, l'accroche du dernier bulletin (lien vers Bulletin), « SILO » en grand, l'accroche du serveur, la ligne de statut (en ligne · joueurs · version). En bas à droite, JOUER et une mention « À jour · Java · mémoire ».
-- **Lancement** : même mise en page. Une ligne du Pacte au-dessus du titre, l'étape en cours, « Niveau 087 / 144 » (la progression exprimée en niveaux), une barre fine graduée en 12 paliers, le nombre de fichiers et un bouton « Voir le journal ». À droite : ANNULER (contour) puis EN JEU (désactivé) une fois prêt.
+- **Lancement** : même mise en page. L'étape en cours et le pourcentage (ligne du Pacte et compteur « Niveau 087 / 144 » retirés à la demande du porteur du projet), une barre fine graduée en 12 paliers, le nombre de fichiers et un bouton « Voir le journal ». À droite : ANNULER (contour) puis EN JEU (désactivé) une fois prêt.
 - **Bulletin** : liste des derniers bulletins en bas à gauche (point ambre sur le sélectionné), article à droite dans un panneau de 480 px.
 - **Paramètres** : panneau de 400 px à droite, translucide : mémoire (curseur), résolution + plein écran, Java, dossier du jeu, fond animé, fermer au démarrage du jeu ; pied avec version, Discord, YouTube.
 

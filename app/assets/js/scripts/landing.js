@@ -30,7 +30,7 @@ const launch_button           = document.getElementById('launch_button')
 const launch_details          = document.getElementById('launch_details')
 const launch_progress         = document.getElementById('launch_progress')
 const launch_fill             = document.getElementById('launch_fill')
-const launch_level            = document.getElementById('launch_level')
+const launch_percent          = document.getElementById('launch_percent')
 const launch_progress_label   = document.getElementById('launch_progress_label')
 const launch_details_text     = document.getElementById('launch_details_text')
 const launch_state            = document.getElementById('launch_state')
@@ -43,9 +43,8 @@ const loggerLanding = LoggerUtil.getLogger('Landing')
 /* Launch Progress Wrapper Functions */
 
 // The launch runs several independent stages, each reporting its own 0-100%.
-// They are mapped onto one monotonic progress, shown as "Niveau 087 / 144"
-// (the silo's 144 levels). The background keeps its normal speed.
-const LAUNCH_LEVELS = 144
+// They are mapped onto one monotonic progress, shown as a percentage.
+// The background keeps its normal speed.
 const LAUNCH_PHASES = {
     validate: [0, 0.12],
     vanilla:  [0.12, 0.42],
@@ -206,11 +205,11 @@ function setLaunchPercentage(percent){
 }
 
 function renderLaunchProgress(){
-    const level = Math.round(launchProgress * LAUNCH_LEVELS)
-    launch_level.textContent = Lang.queryJS('landing.level', { level: String(level).padStart(3, '0'), total: LAUNCH_LEVELS })
+    const percent = Math.round(launchProgress * 100)
+    launch_percent.textContent = percent + '\u00A0%'
     launch_fill.style.width = (launchProgress * 100).toFixed(2) + '%'
-    launch_progress.setAttribute('aria-valuenow', level)
-    const parts = [Math.round(launchProgress * 100) + '\u00A0%']
+    launch_progress.setAttribute('aria-valuenow', percent)
+    const parts = []
     if(launchBytes != null && launchBytes.total > 0 && launchBytes.done < launchBytes.total){
         if(launchBytes.rate > 0){
             parts.push(Lang.queryJS('landing.rate', { rate: formatBytes(launchBytes.rate) }))

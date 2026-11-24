@@ -7,7 +7,6 @@
                 <span class="teaserTitle" id="newsTeaserTitle"></span>
                 <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="muted"><path d="M2 6h8M6.5 2.5 10 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <p class="small pacte onlyLaunch"><%- lang('landing.pacte') %></p>
             <div>
                 <h1 class="title" id="landingTitle"><%- lang('landing.title') %></h1>
                 <p class="tagline onlyHome" id="landingTagline"><%- lang('landing.tagline') %></p>
@@ -21,9 +20,9 @@
             <div class="launchBlock onlyLaunch" id="launch_details">
                 <div class="row">
                     <span id="launch_details_text" role="status"><%- lang('landing.launchDetails') %></span>
-                    <span class="level" id="launch_level"></span>
+                    <span class="percent" id="launch_percent"></span>
                 </div>
-                <div class="track" id="launch_progress" role="progressbar" aria-label="<%- lang('landing.progressLabel') %>" aria-valuemin="0" aria-valuemax="144" aria-valuenow="0"><div class="fill" id="launch_fill"></div></div>
+                <div class="track" id="launch_progress" role="progressbar" aria-label="<%- lang('landing.progressLabel') %>" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill" id="launch_fill"></div></div>
                 <div class="row rowSmall">
                     <span class="muted ellipsis" id="launch_progress_label"></span>
                     <button class="linkbtn" id="launch_log_toggle" type="button" aria-expanded="false" aria-controls="launch_log"><%- lang('landing.showLog') %></button>
